@@ -1,0 +1,1183 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B3D2E">
+<script>
+  // 🏜 Ilova ikonkasi endi markaz saytini ochadi (chap menyu); bu ilova esa uning ichida «📚 Arab tili» bo'lib turadi (ustoz, 2026-10-06).
+  // Yo'naltirilmaydi: markaz ichidagi oyna (iframe), «?app» havolasi, Telegram bot, ustoz havolasi (#ustoz=), taklif havolasi (?ref=).
+  (function () {
+    var q = location.search, h = location.hash;
+    if (window.top !== window.self || /[?&](app|ref)=?/.test(q) || /ustoz=|tgWebApp/.test(h) || /Telegram/i.test(navigator.userAgent)) return;
+    location.replace("markaz/" + h);
+  })();
+</script>
+<script>
+  // Dizayn: "premium" (asosiy) yoki "krem" — Profilda tanlanadi
+  (function () {
+    var s = "mundil"; try { s = localStorage.getItem("tb_style") || s; } catch (e) { /* */ }
+    if (s === "neon" || s === "sahro") s = "mundil";   // neon (2026-10-07) va sahro (2026-10-17) uslublari o'rniga — Mundil.uz
+    document.documentElement.dataset.style = s;
+    document.querySelector('meta[name="theme-color"]').content = s === "krem" ? "#1F4D3A" : s === "mundil" ? "#0B3D2E" : "#0C1218";
+  })();
+</script>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Mundil.uz">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Mundil.uz — arab tili</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230E5A4A'/%3E%3Ctext x='32' y='44' font-size='38' text-anchor='middle' fill='white' font-family='serif'%3E%D8%B6%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=Nunito:wght@600;700;800;900&family=Onest:wght@400;500;600;700&family=Amiri:wght@400;700&display=swap">
+<style>
+  /* Uslub: krem fon, to'q yashil, oltin; ravoq shakllari va geometrik naqsh */
+  :root {
+    color-scheme: light;
+    --bg: #F5EFE1; --surface: #FCF9F1; --surface-2: #EEE6D3; --ink: #1D2A22; --muted: #6D6853; --line: #E1D6BC;
+    --brand: #1F4D3A; --brand-2: #2C6A50; --brand-ink: #FFFFFF; --brand-soft: #DFE8D9;
+    --gold: #A07A22; --gold-soft: #F4E7C4; --gold-line: #D7BE7E; --good: #2E7D4F; --good-soft: #E1EEDD; --bad: #B4443A; --bad-soft: #F6E1DA;
+    --shadow: 0 1px 1px rgba(60,48,20,.05), 0 6px 18px rgba(60,48,20,.07);
+    --r-lg: 20px; --r-md: 14px; --r-sm: 11px;
+    --f-display: "Lora", Georgia, serif;
+    --f-body: "Onest", "Amiri", system-ui, "Segoe UI", sans-serif;
+    --f-ar: "Amiri", "Noto Naskh Arabic", "Traditional Arabic", serif;
+    --pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44'%3E%3Cg fill='none' stroke='%23E4C77A' stroke-opacity='.22' stroke-width='1'%3E%3Crect x='13' y='13' width='18' height='18'/%3E%3Crect x='13' y='13' width='18' height='18' transform='rotate(45 22 22)'/%3E%3Cpath d='M0 22h9M35 22h9M22 0v9M22 35v9'/%3E%3C/g%3E%3C/svg%3E");
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.45;
+         padding: env(safe-area-inset-top, 0px) 16px 0; -webkit-tap-highlight-color: transparent; }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; border: 0; background: none; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  .ar { font-family: var(--f-ar); direction: rtl; unicode-bidi: isolate; }
+  .app { max-width: 460px; margin: 0 auto; padding-block: 14px 110px; }
+
+  .top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; gap: 10px; }
+  .hello { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .logo { width: 42px; height: 48px; border-radius: 21px 21px 8px 8px; background: #1F4D3A; color: #F1D892; border: 1.5px solid var(--gold-line); display: grid; place-items: center; font-size: 28px; line-height: 1; padding-bottom: 4px; flex: none; }
+  .hello small { display: block; color: var(--muted); font-size: 13px; }
+  .hello strong { font-family: var(--f-display); font-weight: 600; font-size: 16px; letter-spacing: -.01em; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chips { display: flex; gap: 6px; flex: none; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px; border-radius: 999px; background: var(--surface); box-shadow: var(--shadow); font-weight: 700; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  .chip.fire { color: var(--gold); }
+  .chip.off { filter: grayscale(1); opacity: .6; }
+
+  /* Ravoq (arka) shaklidagi kunlik missiya */
+  .mission { position: relative; overflow: hidden; text-align: center; border-radius: 200px 200px var(--r-lg) var(--r-lg) / 130px 130px var(--r-lg) var(--r-lg);
+             padding: 84px 22px 22px; color: #fff; box-shadow: var(--shadow);
+             background: var(--pattern) center top / 44px 44px, linear-gradient(180deg, #245A43 0%, #1A4232 100%); }
+  .mission > * { position: relative; z-index: 1; }
+  .mission::before { content: ""; position: absolute; inset: 8px; border: 1.5px solid rgba(228,199,122,.6); border-radius: 192px 192px 14px 14px / 124px 124px 14px 14px; pointer-events: none; }
+  .mission::after { content: "ض"; font-family: var(--f-ar); position: absolute; left: 50%; top: 14px; transform: translateX(-50%); font-size: 40px; line-height: 1; color: #E9CD84; pointer-events: none;
+                    width: 56px; height: 56px; display: grid; place-items: center; padding-bottom: 8px; border-radius: 50%; background: #1A4232; border: 1.5px solid rgba(228,199,122,.7); }
+  .eyebrow { font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; color: #E9CD84; }
+  .mission h2 { font-family: var(--f-display); font-weight: 700; font-size: 23px; margin: 6px auto 4px; text-wrap: balance; }
+  .mission p { margin: 0 auto 16px; opacity: .9; max-width: 32ch; }
+  .mission-row { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .dots { display: flex; gap: 5px; }
+  .dots i { width: 22px; height: 6px; border-radius: 4px; background: rgba(255,255,255,.25); }
+  .dots i.on { background: #E9CD84; }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 18px; border-radius: 14px; font-weight: 700; transition: transform .12s ease; }
+  .btn:active { transform: scale(.97); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn-light { background: linear-gradient(180deg, #EBCF86, #D3AE55); color: #1A3A2B; padding-inline: 26px; box-shadow: 0 3px 10px rgba(0,0,0,.18); }
+  .btn-brand { background: var(--brand); color: var(--brand-ink); }
+  .btn-soft { background: var(--surface-2); color: var(--ink); }
+  .btn-danger { background: var(--bad-soft); color: var(--bad); }
+  .btn-block { width: 100%; }
+  a.btn { text-decoration: none; }
+
+  .rankline { margin-top: 12px; background: var(--surface); border-radius: var(--r-md); padding: 12px 14px; box-shadow: var(--shadow); display: grid; gap: 6px; }
+  .rankline .l { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
+  .rankline .l b { color: var(--ink); }
+  .bar { height: 7px; border-radius: 5px; background: var(--surface-2); overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--gold); border-radius: 5px; }
+
+  .section-title { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin: 24px 2px 10px; }
+  .section-title h3 { margin: 0; font-family: var(--f-display); font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 8px; flex: none; }
+  .section-title h3::before { content: ""; width: 7px; height: 7px; background: var(--gold); transform: rotate(45deg); flex: none; }
+  .section-title span { color: var(--muted); font-size: 13px; text-align: right; }
+
+  .tiles { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+  .tile { text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px; box-shadow: var(--shadow); display: grid; gap: 10px; align-content: start; }
+  .tile .ic { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-size: 19px; }
+  .tile .ic svg { width: 22px; height: 22px; }
+  .tiles .ic { background: #1F4D3A !important; color: #E9CD84; border: 1.5px solid var(--gold-line); }
+  .tile b { font-weight: 700; }
+  .tile small { color: var(--muted); display: block; font-size: 12.5px; margin-top: 1px; }
+  .ic.red { background: var(--bad-soft); } .ic.blue { background: var(--brand-soft); } .ic.gold { background: var(--gold-soft); } .ic.green { background: var(--good-soft); }
+  .badge-count { display: inline-block; min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--bad); color: #fff; font-size: 12px; font-weight: 700; text-align: center; margin-left: 4px; }
+
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 18px; box-shadow: var(--shadow); }
+  /* Ichki oltin ramka: kun so'zi va savol kartasi */
+  #wotd, .q-card { border: 1px solid var(--line); box-shadow: inset 0 0 0 6px var(--surface), inset 0 0 0 7px var(--gold-line), var(--shadow); }
+  .wotd-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .wotd-word { font-size: 44px; font-weight: 700; margin: 6px 0 2px; line-height: 1.6; text-align: center; }
+  .listen { width: 42px; height: 42px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; flex: none; font-size: 18px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .opt-sm { padding: 10px; border-radius: 12px; background: var(--surface-2); font-weight: 600; }
+  .opt-sm.good { background: var(--good-soft); color: var(--good); }
+  .opt-sm.bad { background: var(--bad-soft); color: var(--bad); }
+  .muted { color: var(--muted); }
+
+  /* Darslar yo'li */
+  .path { position: relative; display: grid; gap: 10px; }
+  .path::before { content: ""; position: absolute; left: 27px; top: 20px; bottom: 20px; width: 2px; background: var(--line); }
+  .lesson { position: relative; display: flex; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px 14px 12px 8px; box-shadow: var(--shadow); text-align: left; width: 100%; }
+  .node { width: 40px; height: 40px; border-radius: 12px; flex: none; display: grid; place-items: center; font-family: var(--f-display); font-weight: 700; font-size: 15px; background: var(--surface-2); color: var(--muted); position: relative; z-index: 1; border: 1.5px solid var(--line); }
+  .lesson.done .node { background: var(--brand); color: #E9CD84; border-color: var(--gold-line); }
+  .lesson.current .node { background: var(--gold-soft); color: var(--gold); border-color: var(--gold); box-shadow: 0 0 0 4px color-mix(in srgb, var(--gold) 18%, transparent); }
+  .lesson.locked { opacity: .62; box-shadow: none; background: transparent; border: 1px dashed var(--line); }
+  .lesson .t { flex: 1; min-width: 0; }
+  .lesson .t b { display: block; font-weight: 600; }
+  .lesson .t small { color: var(--muted); }
+  .lesson .letters { font-size: 22px; font-weight: 700; color: var(--brand); flex: none; }
+  .lesson.locked .letters { color: var(--muted); }
+  .exam-card { margin-top: 14px; display: flex; gap: 14px; align-items: center; text-align: left; width: 100%; }
+
+  /* Darajalar xaritasi (ilon izi yo'l) */
+  .lvmap { position: relative; margin-top: 6px; }
+  .lvmap svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  /* 🗺 Darslar manzarasi: daraja hududlari va chetdagi bezaklar */
+  .mz { position: absolute; left: -8px; right: -8px; border-radius: 28px; pointer-events: none; overflow: hidden; }
+  .mz-title { position: absolute; top: 12px; left: 14px; font-size: 12px; font-weight: 700; letter-spacing: .04em; color: var(--muted); opacity: .9; }
+  .mz-oasis { background: radial-gradient(60% 40% at 85% 20%, rgba(255,214,107,.16), transparent 70%), radial-gradient(50% 30% at 10% 70%, rgba(61,186,142,.14), transparent 70%), linear-gradient(180deg, rgba(214,169,78,.10), rgba(214,169,78,.03)); border: 1px solid rgba(214,169,78,.18); }
+  .mz-city { background: radial-gradient(60% 40% at 15% 15%, rgba(91,192,248,.16), transparent 70%), radial-gradient(50% 30% at 90% 75%, rgba(176,106,179,.14), transparent 70%), linear-gradient(180deg, rgba(91,192,248,.08), rgba(91,192,248,.02)); border: 1px solid rgba(91,192,248,.18); }
+  .mz-fog { background: linear-gradient(180deg, rgba(152,162,172,.10), rgba(152,162,172,.03)); border: 1px dashed rgba(152,162,172,.25); }
+  .mz-deco { position: absolute; transform: translate(-50%, -50%); font-size: 30px; opacity: .8; pointer-events: none; filter: drop-shadow(0 3px 6px rgba(0,0,0,.25)); animation: mzfloat 5s ease-in-out infinite; }
+  .mz-deco:nth-of-type(2n) { animation-delay: -2.5s; }
+  @keyframes mzfloat { 50% { transform: translate(-50%, -58%); } }
+  .lv, .ln { z-index: 1; }
+  .lvmap path { fill: none; stroke: var(--gold-line); stroke-width: 3; stroke-dasharray: 2 9; stroke-linecap: round; }
+  .lvmap path.done { stroke: var(--gold); stroke-dasharray: none; }
+  .lv { position: absolute; transform: translate(-50%, -38px); display: grid; justify-items: center; gap: 6px; width: 150px; text-align: center; }
+  .lv-node { position: relative; width: 76px; height: 76px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); border: 2px solid var(--line); color: var(--muted); font-family: var(--f-display); font-weight: 700; font-size: 17px; }
+  .lv-node small { font-size: 11px; font-family: var(--f-body); font-weight: 600; }
+  .lv.current .lv-node { width: 92px; height: 92px; margin-top: -8px; color: var(--gold); font-size: 21px; border: 0;
+    background: radial-gradient(circle, var(--surface) 0 60%, transparent 61%), conic-gradient(var(--gold) calc(var(--p) * 1%), var(--surface-2) 0);
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--gold) 15%, transparent), 0 10px 30px color-mix(in srgb, var(--gold) 25%, transparent); }
+  .lv.done .lv-node { background: var(--brand); color: var(--brand-ink); border-color: var(--gold-line); }
+  .lv.soon .lv-node::after { content: "🔒"; position: absolute; right: -4px; bottom: -2px; font-size: 16px; }
+  .lv-label { display: grid; gap: 1px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 6px 10px; box-shadow: var(--shadow); }
+  .lv b { font-weight: 700; font-size: 13.5px; }
+  .lv b.ar { font-size: 18px; line-height: 1.7; }
+  .lv small.s { color: var(--muted); font-size: 11.5px; line-height: 1.3; }
+  .lv.soon b { color: var(--muted); }
+  .lv-here { position: absolute; top: -34px; background: var(--gold); color: var(--brand-ink); font-weight: 700; font-size: 11.5px; padding: 4px 10px; border-radius: 8px; white-space: nowrap; }
+  .lv-here::after { content: ""; position: absolute; left: 50%; bottom: -5px; transform: translateX(-50%) rotate(45deg); width: 8px; height: 8px; background: inherit; }
+  [data-style="krem"] .lv-here { color: #fff; }
+  /* Dars doirachalari */
+  .ln { position: absolute; transform: translate(-50%, -50%); width: 64px; height: 64px; display: grid; place-items: center; }
+  .ln-dot { width: 60px; height: 60px; border-radius: 50%; display: grid; place-items: center; font-family: var(--f-display); font-weight: 700; font-size: 19px;
+            background: var(--surface-2); color: var(--muted); border: 2px solid var(--line); box-shadow: 0 5px 0 var(--line); transition: transform .1s; }
+  .ln:active .ln-dot { transform: translateY(3px); box-shadow: 0 2px 0 var(--line); }
+  .ln.done .ln-dot { background: linear-gradient(160deg, #E9C674, #C4952F); color: #1A1408; border-color: #F0D591; box-shadow: 0 5px 0 #8C6A22; }
+  .ln.current .ln-dot { width: 68px; height: 68px; background: var(--surface); color: var(--gold); border: 3px solid var(--gold); box-shadow: 0 5px 0 var(--gold-line), 0 0 0 7px color-mix(in srgb, var(--gold) 16%, transparent), 0 0 26px color-mix(in srgb, var(--gold) 35%, transparent); animation: glow 2.2s ease-in-out infinite; }
+  @keyframes glow { 50% { box-shadow: 0 5px 0 var(--gold-line), 0 0 0 11px color-mix(in srgb, var(--gold) 8%, transparent), 0 0 34px color-mix(in srgb, var(--gold) 45%, transparent); } }
+  .ln.current .lv-here { top: -38px; }
+  .ln.exam .ln-dot { font-size: 26px; border-radius: 18px; }
+  .ln.exam.open .ln-dot { border-color: var(--gold); background: var(--gold-soft); }
+  .ln-lab { position: absolute; top: 50%; transform: translateY(-50%); white-space: nowrap; font-size: 19px; color: var(--muted); }
+  .ln-lab.right { left: 76px; } .ln-lab.left { right: 76px; }
+  .ln-lab.long { font-size: 16px; }
+  .ln.exam .ln-lab { position: absolute; top: 72px; left: 50%; transform: translateX(-50%); font-size: 13px; font-weight: 700; }
+  .ln.done .ln-lab, .ln.current .ln-lab { color: var(--ink); }
+
+  /* Lug'at */
+  .seg { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 12px; scrollbar-width: none; }
+  .seg button { flex: none; padding: 8px 12px; border-radius: 999px; background: var(--surface); box-shadow: var(--shadow); font-weight: 600; font-size: 13.5px; }
+  .seg button[aria-pressed="true"] { background: var(--brand); color: var(--brand-ink); }
+  .seg button:disabled { opacity: .45; box-shadow: none; }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 10px; }
+  .words { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+  .word { background: var(--surface); border-radius: var(--r-md); padding: 12px 10px 10px; box-shadow: var(--shadow); text-align: center; display: grid; gap: 2px; }
+  .word .ar { font-size: 24px; font-weight: 700; line-height: 1.7; }
+  .word small { color: var(--muted); min-height: 1.3em; }
+  .word.hide small { color: transparent; background: var(--surface-2); border-radius: 6px; }
+  .phrases { display: grid; gap: 8px; }
+  .phrase { display: flex; align-items: center; gap: 12px; background: var(--surface); border-radius: var(--r-md); padding: 10px 12px; box-shadow: var(--shadow); text-align: left; width: 100%; }
+  .phrase .t { flex: 1; min-width: 0; display: grid; }
+  .phrase .ar { font-size: 19px; font-weight: 700; line-height: 1.7; text-align: right; }
+  .phrase small { color: var(--muted); }
+
+  /* Profil */
+  .profile-card { text-align: center; }
+  .big-ava { width: 72px; height: 82px; border-radius: 36px 36px 14px 14px; margin: 0 auto 10px; background: #1F4D3A; color: #E9CD84; border: 2px solid var(--gold-line); display: grid; place-items: center; font-family: var(--f-display); font-size: 28px; font-weight: 700; }
+  .rank-title { display: inline-block; margin-top: 6px; padding: 4px 10px; border-radius: 999px; background: var(--gold-soft); color: var(--gold); font-weight: 700; font-size: 13px; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 16px; }
+  .stat b { display: block; font-family: var(--f-display); font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat small { color: var(--muted); font-size: 11.5px; }
+  .badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+  .bdg { background: var(--surface); border-radius: var(--r-sm); padding: 12px 8px; text-align: center; box-shadow: var(--shadow); }
+  .bdg .e { font-size: 26px; }
+  .bdg b { display: block; font-size: 12.5px; margin-top: 4px; line-height: 1.25; }
+  .bdg small { display: block; font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.3; }
+  .bdg.off { box-shadow: none; background: var(--surface-2); }
+  .bdg.off .e { filter: grayscale(1); opacity: .35; }
+  .bdg.off b { color: var(--muted); }
+  .settings { display: grid; gap: 8px; margin-top: 8px; }
+  .style-pick { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; flex-wrap: wrap; }
+
+  /* Pastki menyu */
+  .tabbar { position: fixed; left: 0; right: 0; bottom: 0; padding: 8px 16px calc(10px + env(safe-area-inset-bottom, 0px)); background: color-mix(in srgb, var(--bg) 90%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border-top: 1px solid var(--line); z-index: 5; }
+  .tabbar nav { max-width: 460px; margin: 0 auto; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0; }
+  .tab[hidden] { display: none; }
+  .tab { display: grid; justify-items: center; gap: 2px; padding: 6px 0; border-radius: 12px; color: var(--muted); font-size: 10.5px; white-space: nowrap; font-weight: 600; }
+  .tab svg { width: 22px; height: 22px; }
+  .tab { position: relative; }
+  .tab[aria-current="page"] { color: var(--brand); }
+  .tab[aria-current="page"]::before { content: ""; position: absolute; top: -9px; width: 26px; height: 3px; border-radius: 0 0 3px 3px; background: var(--gold); }
+
+  /* Test */
+  .quiz { position: fixed; inset: 0; background: var(--bg); z-index: 10; overflow-y: auto; padding: calc(12px + env(safe-area-inset-top, 0px)) 16px calc(24px + env(safe-area-inset-bottom, 0px)); }
+  .quiz-in { max-width: 460px; margin: 0 auto; display: grid; gap: 16px; }
+  .quiz-top { display: flex; align-items: center; gap: 12px; }
+  .x { width: 38px; height: 38px; border-radius: 12px; background: var(--surface); display: grid; place-items: center; box-shadow: var(--shadow); flex: none; }
+  .progress { flex: 1; height: 10px; background: var(--surface-2); border-radius: 6px; overflow: hidden; }
+  .progress i { display: block; height: 100%; background: var(--good); border-radius: 6px; transition: width .3s ease; }
+  .timer { position: relative; width: 44px; height: 44px; flex: none; }
+  .timer svg { transform: rotate(-90deg); display: block; }
+  .timer span { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--f-display); font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .timer.low span { color: var(--bad); }
+  .q-meta { color: var(--muted); font-weight: 600; font-size: 13px; }
+  .section-banner { background: var(--brand-soft); color: var(--brand); border-radius: var(--r-sm); padding: 10px 14px; font-weight: 700; }
+  .q-card { background: var(--surface); border-radius: var(--r-lg); padding: 24px 20px; box-shadow: inset 0 0 0 6px var(--surface), inset 0 0 0 7px var(--gold-line), var(--shadow); text-align: center; display: grid; gap: 8px; justify-items: center; }
+  .q-card .p-line { font-weight: 600; font-size: 16px; text-wrap: balance; }
+  .q-card .ar-line { font-size: 30px; font-weight: 700; line-height: 1.7; }
+  .q-card .ar-line.huge { font-size: 46px; }
+  .q-card .p-line.mixed { line-height: 1.9; }
+  .ar-inline { font-size: 1.45em; font-weight: 700; unicode-bidi: isolate; direction: rtl; }
+  .q-card .big-listen { width: 76px; height: 76px; font-size: 32px; }
+  .opts { display: grid; gap: 10px; }
+  .opt { display: flex; align-items: center; gap: 12px; text-align: left; background: var(--surface); border: 2px solid var(--line); border-radius: 16px; padding: 14px 16px; font-weight: 600; font-size: 16px; transition: border-color .15s, background .15s, transform .1s; }
+  .opt .k { width: 28px; height: 28px; border-radius: 9px; background: var(--surface-2); display: grid; place-items: center; font-size: 13px; font-weight: 700; color: var(--muted); flex: none; }
+  .opt .v { flex: 1; min-width: 0; }
+  .opt .v.ar { font-size: 21px; font-weight: 700; text-align: right; line-height: 1.6; }
+  .opt:hover:not(:disabled) { border-color: var(--brand); }
+  .opt.good { border-color: var(--good); background: var(--good-soft); }
+  .opt.good .k { background: var(--good); color: #fff; }
+  .opt.bad { border-color: var(--bad); background: var(--bad-soft); }
+  .opt.bad .k { background: var(--bad); color: #fff; }
+  .opt:disabled { cursor: default; }
+  .feedback { border-radius: var(--r-md); padding: 14px 16px; display: grid; gap: 4px; }
+  .feedback.good { background: var(--good-soft); color: var(--good); }
+  .feedback.bad { background: var(--bad-soft); color: var(--bad); }
+  .feedback b { font-size: 16px; }
+  .feedback p { margin: 0; color: var(--ink); }
+  /* A1: yangi mashq turlari */
+  .q-ins { display: grid; gap: 2px; justify-items: center; }
+  .q-ins .ar { font-size: 21px; font-weight: 700; color: var(--brand); line-height: 1.7; }
+  .q-ins small { color: var(--muted); font-size: 13px; }
+  .slots { min-height: 64px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-start; padding: 10px; border: 2px dashed var(--line); border-radius: 16px; background: var(--surface); }
+  .slots.good { border: 2px solid var(--good); background: var(--good-soft); }
+  .slots.bad { border: 2px solid var(--bad); background: var(--bad-soft); }
+  .slots-ph { color: var(--muted); padding-inline: 6px; }
+  .bank { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .wt { font-family: var(--f-ar); font-size: 21px; font-weight: 700; line-height: 1.5; padding: 6px 14px; border-radius: 12px; background: var(--surface); border: 2px solid var(--line); box-shadow: 0 3px 0 var(--line); transition: transform .1s; }
+  .wt:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--line); }
+  .wt.used { visibility: hidden; }
+  .match { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .mcol { display: grid; gap: 8px; align-content: start; }
+  .mt { min-height: 54px; padding: 8px 10px; border-radius: 14px; background: var(--surface); border: 2px solid var(--line); font-weight: 600; font-size: 15px; line-height: 1.3; transition: border-color .15s, background .15s, opacity .3s; }
+  .mt.ar { font-size: 20px; font-weight: 700; line-height: 1.5; }
+  .mt.sel { border-color: var(--brand); background: var(--brand-soft); }
+  .mt.good { border-color: var(--good); background: var(--good-soft); color: var(--good); opacity: .55; }
+  .mt.bad { border-color: var(--bad); background: var(--bad-soft); animation: shake .3s; }
+  @keyframes shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+  .gloss { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; color: var(--ink); }
+  .gloss span { background: color-mix(in srgb, var(--surface) 70%, transparent); border-radius: 10px; padding: 4px 10px; display: flex; align-items: baseline; gap: 8px; font-size: 14px; }
+  .gloss span.odd { outline: 2px solid var(--gold); }
+  .gloss .ar { font-size: 18px; }
+  /* A1 qismlari: matn, suhbat, harf yig'ish, yozish, qismlar ro'yxati */
+  .passage { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px 14px; box-shadow: var(--shadow); }
+  .passage summary { font-weight: 700; cursor: pointer; padding: 4px 0; }
+  .passage summary .ar { font-size: 18px; }
+  .passage-text { font-size: 20px; line-height: 2; text-align: right; }
+  .passage-text p { margin: 6px 0; }
+  .passage .btn { padding: 8px 12px; font-size: 14px; }
+  .dlg-box { display: flex; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px 14px; box-shadow: var(--shadow); }
+  .dlg-box .big-listen { width: 64px; height: 64px; font-size: 26px; }
+  .dlg-box div { display: grid; gap: 2px; } .dlg-box small { color: var(--muted); }
+  .spell-prev { text-align: center; font-size: 40px; font-weight: 700; min-height: 64px; line-height: 1.6; color: var(--brand); }
+  .slots.spell { justify-content: center; min-height: 56px; }
+  .w-in { font-size: 26px; text-align: right; font-weight: 700; padding: 10px 14px; }
+  .w-in.good { border-color: var(--good); background: var(--good-soft); }
+  .w-in.bad { border-color: var(--bad); background: var(--bad-soft); }
+  .akb { display: grid; gap: 6px; direction: rtl; background: var(--surface-2); border-radius: 14px; padding: 8px 4px; }
+  .akb-row { display: flex; gap: 4px; justify-content: center; }
+  .akb-k { flex: 1; min-width: 0; padding: 0; max-width: 34px; height: 44px; border-radius: 8px; background: var(--surface); font-family: var(--f-ar); font-size: 20px; font-weight: 700; box-shadow: 0 2px 0 var(--line); }
+  .akb-k:active { transform: translateY(1px); box-shadow: none; }
+  .akb-k.wide { max-width: none; flex: 4; font-family: inherit; font-size: 13px; color: var(--muted); }
+  #kb-sw { justify-self: center; font-size: 13.5px; }
+  .parts-bar { display: grid; gap: 6px; } .parts-bar b { font-size: 13.5px; color: var(--muted); }
+  .parts { display: grid; gap: 8px; }
+  .part { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: var(--surface); border: 2px solid var(--line); border-radius: 16px; padding: 10px 14px; }
+  .part .t { flex: 1; display: grid; gap: 1px; } .part small { color: var(--muted); }
+  .part-ic { width: 40px; height: 40px; border-radius: 12px; background: var(--surface-2); display: grid; place-items: center; font-size: 19px; flex: none; }
+  .part.done { border-color: color-mix(in srgb, var(--good) 45%, var(--line)); }
+  .part.done .part-ic { background: var(--good); color: #fff; font-weight: 700; }
+  .part.next { border-color: var(--gold); box-shadow: 0 0 0 4px color-mix(in srgb, var(--gold) 15%, transparent); }
+  .part .go { font-size: 22px; color: var(--muted); }
+  /* 🎧/🎤 darajali darslar: 4 bosqich chizig'i va yulduzlar */
+  .st4 { display: flex; gap: 4px; margin-top: 5px; } .st4 i { flex: 1; height: 5px; border-radius: 4px; background: var(--surface-2); } .st4 i.on { background: var(--gold); }
+  .part .stars { color: var(--gold); letter-spacing: 1px; font-weight: 700; }
+  .part.locked-row { opacity: .5; }
+  /* 📅 Bugun */
+  .today { display: grid; gap: 12px; }
+  .week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .wd { display: grid; justify-items: center; gap: 4px; padding: 6px 0; border-radius: 14px; }
+  .wd small { color: var(--muted); font-size: 11.5px; font-weight: 700; }
+  .wd span { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; border: 2px solid var(--line); background: var(--surface); font-variant-numeric: tabular-nums; }
+  .wd.today span { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+  .wd.done span { border-color: var(--good); box-shadow: inset 0 0 0 2px var(--good); }
+  .wd.part span { border-color: var(--gold); }
+  .wd.missed span { border-color: var(--bad); color: var(--bad); }
+  .wd.rest span, .wd.none span { opacity: .45; }
+  .wd.future span { opacity: .75; }
+  .wd.sel { background: var(--surface-2); }
+  .t-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .t-head div { display: grid; } .t-head small { color: var(--muted); font-weight: 600; } .t-head b { font-size: 16px; }
+  .t-head .ar { font-size: 18px; font-weight: 700; color: var(--gold); }
+  .t-sum { display: grid; gap: 6px; } .t-sum div:first-child { display: flex; justify-content: space-between; }
+  .t-sum span { color: var(--muted); font-weight: 700; }
+  .tcard { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 10px; box-shadow: var(--shadow); display: grid; gap: 4px; }
+  .tcard-h, .pbox { display: flex; align-items: center; gap: 12px; padding: 4px; text-align: left; width: 100%; }
+  .t-ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-size: 19px; background: var(--brand-soft); flex: none; }
+  .t-ic.big { width: 50px; height: 50px; font-size: 24px; border-radius: 14px; background: var(--gold-soft); }
+  .t-main { flex: 1; display: grid; gap: 5px; min-width: 0; } .t-main small { color: var(--muted); }
+  .trow { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 8px 6px; border-radius: 12px; }
+  .trow.sub { padding-left: 4px; }
+  .trow:not(:disabled):active { background: var(--surface-2); }
+  .trow .arrow { color: var(--muted); width: 14px; }
+  .trow .bar { height: 6px; }
+  .trow.done .t-ic { background: var(--good); color: #fff; font-weight: 700; }
+  .trow.done .bar i { background: var(--good); }
+  .t-pct { font-weight: 700; color: var(--muted); font-size: 13.5px; min-width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
+  .trow:disabled { cursor: default; }
+  .t-note { font-size: 13px; margin: 0; }
+  .t-soon { text-align: center; display: grid; gap: 6px; justify-items: center; padding: 28px 18px; }
+  .t-soon .ar { font-size: 54px; font-weight: 700; color: var(--gold); line-height: 1.6; }
+  .t-soon b { font-size: 18px; } .t-soon p { margin: 4px 0 10px; }
+  .pbox .go { font-size: 22px; color: var(--muted); }
+  /* 🧑‍🎨 Avatar */
+  .ava.has-img { background: none; padding: 0; overflow: hidden; }
+  .ava svg, .big-ava svg, .av-prev svg, .av-opt svg { width: 100%; height: 100%; display: block; }
+  .big-ava.has-img { width: 104px; height: 104px; border-radius: 50%; padding: 0; overflow: hidden; background: none; border: 3px solid var(--gold-line); }
+  .champ-ava { width: 46px; height: 46px; float: right; margin-left: 10px; border-radius: 50%; overflow: hidden; border: 2px solid rgba(255,255,255,.7); }
+  .champ-ava svg { width: 100%; height: 100%; display: block; }
+  .av-prev { width: 150px; height: 150px; margin: 0 auto; border-radius: 50%; overflow: hidden; border: 3px solid var(--gold-line); }
+  .av-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+  .av-tabs button { flex: none; padding: 7px 11px; border-radius: 999px; background: var(--surface-2); font-weight: 600; font-size: 13px; }
+  .av-tabs button[aria-pressed="true"] { background: var(--brand); color: var(--brand-ink); }
+  .av-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); grid-auto-rows: 66px; gap: 8px; max-height: 236px; overflow-y: auto; padding: 2px; }
+  .av-opt { height: 66px; border-radius: 16px; background: var(--surface-2); border: 2px solid transparent; overflow: hidden; padding: 0; display: grid; place-items: center; font-size: 22px; }
+  .av-opt[aria-pressed="true"] { border-color: var(--gold); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 25%, transparent); }
+  .av-opt.sw span { width: 60%; height: 60%; border-radius: 50%; border: 2px solid rgba(0,0,0,.15); }
+  .av-row { display: flex; gap: 8px; } .av-row .btn { flex: 1; }
+  .av-name { font-size: 14px; color: var(--muted); } .av-credit { font-size: 11.5px; text-align: center; margin: 0; }
+  /* 📝 Davomat */
+  .att-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+  .att-head b { font-family: var(--f-display); font-size: 17px; text-align: center; flex: 1; }
+  .att-head .btn { padding: 8px 14px; }
+  .att-sum { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .att-sum span { background: var(--surface-2); border-radius: 999px; padding: 4px 10px; font-size: 13px; font-weight: 600; }
+  .att-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .att-row:last-child { border-bottom: 0; }
+  .att-row .name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .att-btns { display: flex; gap: 4px; }
+  .att-btns button { width: 42px; height: 38px; border-radius: 10px; background: var(--surface-2); font-size: 17px; opacity: .45; border: 2px solid transparent; }
+  .att-btns button[aria-pressed="true"] { opacity: 1; }
+  .att-btns button[data-s="present"][aria-pressed="true"] { border-color: var(--good); background: var(--good-soft); }
+  .att-btns button[data-s="late"][aria-pressed="true"] { border-color: var(--gold); background: var(--gold-soft); }
+  .att-btns button[data-s="absent"][aria-pressed="true"] { border-color: var(--bad); background: var(--bad-soft); }
+  .att-card .att-row small { color: var(--muted); }
+  .att-stat { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px; text-align: center; }
+  .att-stat div { background: var(--surface-2); border-radius: 12px; padding: 8px; } .att-stat b { display: block; font-size: 18px; }
+  /* 📈 Progress */
+  .prize { background: linear-gradient(150deg, #8A6A26, #D6A94E); color: #fff; border-radius: var(--r-lg); padding: 14px; box-shadow: var(--shadow); margin-bottom: 12px; }
+  .prize > small { display: block; opacity: .9; font-weight: 600; } .prize > b { font-family: var(--f-display); font-size: 17px; }
+  .podium { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; text-align: center; }
+  .podium div { background: rgba(0,0,0,.18); border-radius: 14px; padding: 8px 4px; display: grid; justify-items: center; gap: 2px; }
+  .podium .ava { width: 44px; height: 44px; } .podium small { font-size: 11.5px; opacity: .9; }
+  .podium b { font-size: 13px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prog-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .prog-row:last-child { border-bottom: 0; }
+  .prog-row .rk { width: 22px; text-align: center; font-weight: 700; color: var(--muted); flex: none; }
+  .prog-row .nm { flex: 1; min-width: 0; display: grid; gap: 2px; }
+  .prog-row .nm b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prog-row .nm small { color: var(--muted); font-size: 12px; }
+  .prog-row .val { font-family: var(--f-display); font-weight: 700; font-size: 16px; white-space: nowrap; }
+  .idle { color: var(--bad); font-weight: 700; }
+  .prog-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .kv-ban { width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; background: linear-gradient(135deg, #E09A2B, #C8553D); color: #fff; border-radius: 16px; padding: 12px 14px; box-shadow: 0 5px 0 rgba(0,0,0,.18); }
+  .kv-ban .e { font-size: 28px; } .kv-ban b { display: block; font-size: 14.5px; } .kv-ban small { opacity: .92; font-weight: 700; }
+  .pg, .stat, .tc-stat { cursor: pointer; transition: transform .12s; } .pg:active, .stat:active, .tc-stat:active { transform: scale(.96); }
+  .wig { animation: wig .45s ease; } @keyframes wig { 0% { transform: rotate(0) } 20% { transform: rotate(-3deg) scale(1.03) } 45% { transform: rotate(3deg) scale(1.03) } 70% { transform: rotate(-1.5deg) } 100% { transform: rotate(0) } }
+  .pg { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px; box-shadow: var(--shadow); display: grid; gap: 6px; }
+  .pg small { color: var(--muted); font-weight: 600; } .pg b { font-family: var(--f-display); font-size: 20px; } .pg span { font-size: 12px; color: var(--muted); }
+  /* 🧪 Kuboklar va arenalar */
+  .arena { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: linear-gradient(150deg, #2B4A6B, #1C2E44); color: #fff; border-radius: var(--r-lg); padding: 12px 14px; margin-bottom: 4px; box-shadow: var(--shadow); }
+  .arena-ic { font-size: 38px; flex: none; } .arena .t { flex: 1; display: grid; gap: 4px; min-width: 0; }
+  .arena small { opacity: .85; font-size: 12px; } .arena b { font-family: var(--f-display); font-size: 17px; }
+  .arena .bar { background: rgba(255,255,255,.18); } .arena .bar i { background: #F2C14E; }
+  .arena-tr { font-family: var(--f-display); font-weight: 700; font-size: 18px; white-space: nowrap; }
+  .arenas { display: grid; gap: 6px; }
+  .ar-step { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 12px; background: var(--surface-2); opacity: .55; }
+  .ar-step span { font-size: 24px; } .ar-step b { flex: 1; } .ar-step small { color: var(--muted); font-weight: 700; }
+  .ar-step.on { opacity: 1; } .ar-step.here { outline: 2px solid var(--gold); }
+  /* 🧪 Sandiqlar */
+  #chests { margin-top: 12px; }
+  .chest-head { display: flex; justify-content: space-between; align-items: baseline; margin: 0 2px 8px; } .chest-head b { font-family: var(--f-display); } .chest-head small { color: var(--muted); }
+  .chest-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .chest { border-radius: 16px; padding: 10px 4px 8px; display: grid; justify-items: center; gap: 2px; text-align: center; min-height: 96px; align-content: center; box-shadow: var(--shadow); color: #fff; }
+  .chest .ci { font-size: 32px; line-height: 1.1; } .chest b { font-size: 11.5px; } .chest small { font-size: 11px; opacity: .9; font-variant-numeric: tabular-nums; }
+  .chest.empty { background: var(--surface); border: 2px dashed var(--line); color: var(--muted); box-shadow: none; }
+  .chest.wood { background: linear-gradient(160deg, #9a6b3f, #6b4423); } .chest.silver { background: linear-gradient(160deg, #a9b4c2, #6e7b8c); }
+  .chest.gold { background: linear-gradient(160deg, #f2c14e, #b8860b); } .chest.magic { background: linear-gradient(160deg, #b06ab3, #4568dc); }
+  .chest.ready { animation: wiggle 1.2s ease-in-out infinite; outline: 3px solid #F2C14E; }
+  @keyframes wiggle { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-4deg); } 75% { transform: rotate(4deg); } }
+  .chest-open { text-align: center; display: grid; gap: 10px; justify-items: center; }
+  .chest-open .big { font-size: 80px; animation: wiggle .5s ease-in-out 3; }
+  .reward { display: flex; align-items: center; gap: 12px; background: var(--surface-2); border-radius: 14px; padding: 10px 14px; width: 100%; }
+  .reward .sw { width: 46px; height: 46px; border-radius: 50%; flex: none; }
+  .av-opt.locked { position: relative; } .av-opt.locked::after { content: "🔒"; position: absolute; font-size: 16px; right: 4px; bottom: 2px; }
+  .av-opt.locked span { opacity: .45; }
+  /* 🧪 So'z kartalari */
+  .cards-btn { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: linear-gradient(150deg, #2B4A6B, #1C2E44); color: #fff; border-radius: var(--r-lg); padding: 12px 14px; margin-bottom: 12px; box-shadow: var(--shadow); }
+  .cards-btn .ci { font-size: 32px; } .cards-btn .t { flex: 1; display: grid; gap: 2px; } .cards-btn small { opacity: .85; }
+  .card-lv { display: flex; gap: 6px; flex-wrap: wrap; }
+  .card-lv span { background: var(--surface-2); border-radius: 999px; padding: 4px 10px; font-size: 13px; font-weight: 700; }
+  .wcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; max-height: 52vh; overflow-y: auto; padding: 2px; }
+  .wcard { border-radius: 14px; padding: 8px 6px; text-align: center; display: grid; gap: 2px; border: 2px solid var(--line); background: var(--surface-2); }
+  .wcard .ar { font-size: 19px; font-weight: 700; line-height: 1.6; } .wcard small { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wcard.l0 { opacity: .45; } .wcard.l1 { border-color: #b07c4f; } .wcard.l2 { border-color: #a9b4c2; } .wcard.l3 { border-color: #f2c14e; background: color-mix(in srgb, #f2c14e 12%, var(--surface-2)); }
+  .wcard.l4 { border-color: #7fd6ff; background: linear-gradient(160deg, color-mix(in srgb, #7fd6ff 20%, var(--surface-2)), color-mix(in srgb, #b06ab3 18%, var(--surface-2))); }
+  /* 🗺 Sayohat xaritasi (multfilm uslubi) */
+  .wmap { position: relative; border-radius: 22px; overflow: hidden; margin: 4px 0 10px;
+    background: radial-gradient(circle at 20% 15%, rgba(255,255,255,.25) 0 2px, transparent 3px) 0 0 / 38px 38px, linear-gradient(180deg, #7fd3f7 0%, #4fb3e8 55%, #2f8fd0 100%); }
+  .wmap svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .wmap path { fill: none; stroke: rgba(255,255,255,.75); stroke-width: 4; stroke-dasharray: 2 9; stroke-linecap: round; }
+  .wmap path.done { stroke: #ffd56b; }
+  .wmap .deco { position: absolute; font-size: 22px; opacity: .85; transform: translate(-50%, -50%); }
+  .isle { position: absolute; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 2px; width: 46%; text-align: center; }
+  .isle .land { width: 74px; height: 64px; display: grid; place-items: center; font-size: 34px; border-radius: 46% 54% 42% 58% / 55% 45% 55% 45%;
+    background: radial-gradient(circle at 50% 40%, #b8e986 0 45%, #7cc44f 46% 70%, #f3d98b 71%); box-shadow: 0 6px 0 rgba(0,0,0,.15), 0 0 0 4px rgba(255,255,255,.35); }
+  .isle .lbl { background: rgba(255,255,255,.92); color: #1d2a22; border-radius: 12px; padding: 3px 9px; display: grid; box-shadow: 0 2px 6px rgba(0,0,0,.15); }
+  .isle .lbl b { font-size: 13px; } .isle .lbl small { font-size: 11px; color: #5b6470; }
+  .isle.locked .land { filter: grayscale(1) brightness(.85); }
+  .isle.locked .lbl { opacity: .8; }
+  .isle.here .land { box-shadow: 0 6px 0 rgba(0,0,0,.15), 0 0 0 5px #ffd56b, 0 0 22px #ffd56b; }
+  .isle .pin { width: 44px; height: 44px; border-radius: 50%; overflow: hidden; border: 3px solid #fff; box-shadow: 0 3px 8px rgba(0,0,0,.3); margin-bottom: -6px; z-index: 1; animation: bob 1.4s ease-in-out infinite; display: grid; place-items: center; font-size: 26px; background: #fff; }
+  .isle .pin svg { width: 100%; height: 100%; display: block; }
+  @keyframes bob { 50% { transform: translateY(-6px); } }
+  /* 📒 Guruh jurnali */
+  .kassa { background: linear-gradient(150deg, #1f6b4f, #2c8a63); color: #fff; border-radius: var(--r-lg); padding: 14px; box-shadow: var(--shadow); margin-bottom: 12px; display: flex; align-items: center; gap: 12px; }
+  .kassa .ci { font-size: 34px; } .kassa div { display: grid; gap: 2px; } .kassa small { opacity: .9; } .kassa b { font-family: var(--f-display); font-size: 19px; }
+  .jr-rules { font-size: 12px; color: var(--muted); margin: 0 2px 10px; line-height: 1.5; }
+  .jr-row .val { text-align: right; display: grid; gap: 2px; } .jr-row .val small { font-family: var(--f-body, inherit); font-size: 11.5px; font-weight: 700; }
+  .debt { color: var(--bad); } .paid-ok { color: var(--good); }
+  .jr-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px 12px; margin-bottom: 8px; display: grid; gap: 8px; box-shadow: var(--shadow); }
+  .jr-top { display: flex; align-items: center; gap: 10px; } .jr-top .nm { flex: 1; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .jr-top .sc { font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+  .jr-btns { display: flex; gap: 4px; flex-wrap: wrap; }
+  .jr-btns button { flex: 1 1 0; min-width: 0; padding: 7px 4px; border-radius: 10px; background: var(--surface-2); font-size: 12px; font-weight: 700; border: 2px solid transparent; white-space: nowrap; }
+  .jr-btns button[aria-pressed="true"] { border-color: var(--gold); background: var(--gold-soft); }
+  .jr-btns button.good[aria-pressed="true"] { border-color: var(--good); background: var(--good-soft); }
+  .jr-btns button.bad[aria-pressed="true"] { border-color: var(--bad); background: var(--bad-soft); }
+  .jr-cnt { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .jr-cnt div { background: var(--surface-2); border-radius: 10px; padding: 4px; display: flex; align-items: center; justify-content: space-between; gap: 2px; font-size: 12px; font-weight: 700; }
+  .jr-cnt button { width: 30px; height: 30px; border-radius: 8px; background: var(--surface); font-weight: 700; font-size: 16px; flex: none; }
+  .jr-cnt span { text-align: center; flex: 1; min-width: 0; }
+  /* 🌍 Dunyo sayohati */
+  #world-card { margin-top: 12px; }
+  .world-card { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: linear-gradient(150deg, #2f8fd0, #1f5f99); color: #fff; border-radius: var(--r-lg); padding: 12px 14px; box-shadow: var(--shadow); }
+  .world-card .wc-ic { font-size: 36px; } .world-card .t { flex: 1; display: grid; gap: 5px; } .world-card small { opacity: .9; font-size: 12px; }
+  .world-card .bar { background: rgba(255,255,255,.22); } .world-card .bar i { background: #ffd56b; } .world-card .go { font-size: 22px; }
+  .world { position: fixed; inset: 0; z-index: 60; background: var(--bg); display: grid; grid-template-rows: auto 1fr auto auto; gap: 8px; padding: calc(10px + env(safe-area-inset-top, 0px)) 12px calc(12px + env(safe-area-inset-bottom, 0px)); }
+  .world-top { display: flex; align-items: center; gap: 10px; } .world-top .t { display: grid; } .world-top b { font-family: var(--f-display); font-size: 17px; } .world-top small { color: var(--muted); }
+  .world-map { position: relative; border-radius: 20px; overflow: hidden; background: #3a9ad9; touch-action: none; min-height: 0; }
+  .world-map svg { width: 100%; height: 100%; display: block; cursor: grab; }
+  .wc { fill: #d5dde3; stroke: #8a99a8; stroke-width: .8; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+  .wc.on { stroke: #34495e; stroke-width: 1.2; }
+  .wc.next { fill: #fff3c4; stroke: #e0a800; stroke-width: 2; stroke-dasharray: 5 4; animation: wnext 1.4s linear infinite; }
+  @keyframes wnext { to { stroke-dashoffset: -18; } }
+  .wstar { text-anchor: middle; dominant-baseline: central; opacity: .55; pointer-events: none; } .wstar.on { opacity: 1; }
+  .w-zoom { position: absolute; right: 10px; bottom: 10px; display: grid; gap: 6px; }
+  .w-zoom button { width: 42px; height: 42px; border-radius: 12px; background: rgba(255,255,255,.92); color: #1d2a22; font-size: 20px; font-weight: 700; box-shadow: 0 3px 8px rgba(0,0,0,.25); }
+  .world-info { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px 14px; display: grid; gap: 2px; font-size: 15px; }
+  .world-info small { color: var(--muted); font-size: 12.5px; }
+  .new-badge.lost { background: var(--bad-soft); color: var(--bad); }
+  .w-credit { color: var(--muted); font-size: 11px; text-align: center; }
+  /* Brend (Mundil.uz) */
+  .logo.logo-img { padding: 0; overflow: hidden; background: none; border: 0; }
+  .logo.logo-img img { width: 100%; height: 100%; display: block; }
+  .tb-motto { text-align: center; color: var(--gold); font-weight: 700; margin: 6px 0 2px; }
+  /* Bosh sahifa brend qatori: oltin «Mundil.uz» yozuvi */
+  .mission::after, [data-style="premium"] .mission::after { content: none; display: none; }
+  .mission, [data-style="premium"] .mission { padding-top: 22px !important; }
+  .tb-hero { display: grid; justify-items: center; gap: 6px; }
+  .mcard { display: flex; align-items: center; gap: 12px; margin-top: 12px; background: var(--surface); border: 1px solid var(--gold-line, var(--line)); border-radius: var(--r-lg); padding: 12px 14px; box-shadow: var(--shadow); }
+  .mc-ic { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; font-size: 24px; background: var(--gold-soft); flex: none; }
+  .mc-t { flex: 1; min-width: 0; display: grid; gap: 2px; } .mc-t b { font-size: 15.5px; } .mc-t span { font-size: 12.5px; color: var(--muted); }
+  .mc-t .eyebrow { font-size: 10.5px; } .mc-t .dots { justify-content: flex-start; margin-top: 4px; }
+  .mc-go { flex: none; padding: 10px 14px; font-size: 14px; white-space: nowrap; }
+  .tb-seal { width: min(70%, 240px); height: auto; filter: drop-shadow(0 4px 16px rgba(214,169,78,.28)); }
+  .tb-emblem { width: 58px; height: 58px; filter: drop-shadow(0 4px 12px rgba(214,169,78,.3)); }
+  .tb-word { font-family: var(--f-ar); font-size: 58px; font-weight: 400; line-height: 1.6; color: #E9C877; text-shadow: 0 4px 18px rgba(214,169,78,.3); margin: 8px 0 -2px; white-space: nowrap; }
+  .tb-motto2 { font-size: 16.5px; font-weight: 700; color: #E9CD84; margin-top: 6px; text-wrap: balance; }
+  /* 🧹 Tozalangan bosh sahifa: kichik muhr + shior bir qatorda, katta missiya kartasi, izohsiz tugmalar */
+  .mission.brandrow, [data-style="premium"] .mission.brandrow { padding: 12px 16px !important; border-radius: var(--r-lg); }
+  .brandrow .tb-hero { display: flex; align-items: center; gap: 14px; text-align: left; }
+  .brandrow .tb-seal { width: 74px; flex: none; }
+  .brandrow .tb-seal text:nth-of-type(1), .brandrow .tb-seal text:nth-of-type(3) { display: none; }   /* kichik muhrda faqat «ت» */
+  .brandrow .tb-seal text:nth-of-type(2) { transform: translateY(-24px); font-size: 120px; }
+  .brandrow .tb-motto2 { margin: 0; font-size: 15px; line-height: 1.35; }
+  .mcard.big { display: grid; gap: 12px; padding: 16px; border: 1.5px solid var(--gold); box-shadow: 0 0 0 4px color-mix(in srgb, var(--gold) 12%, transparent); }
+  .mcard.big .mc-t b { font-family: var(--f-display); font-size: 19px; }
+  .mcard.big .mc-t .eyebrow { font-size: 11.5px; }
+  .mcard.big .mc-go { width: 100%; padding: 14px; font-size: 16px; }
+  .mc-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+  .mc-half { display: grid; gap: 4px; align-content: start; background: var(--surface-2); border-radius: 14px; padding: 10px; }
+  .mc-half b { font-family: var(--f-display); font-size: 16px; } .mc-half small { font-size: 12.5px; color: var(--muted); min-height: 1.3em; }
+  .mcard.big .mc-half .mc-go { width: 100%; padding: 11px 6px; font-size: 14.5px; margin-top: 4px; }
+  .mc-xp { display: grid; gap: 6px; } .mc-xp .l { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); } .mc-xp .l b { color: var(--ink); }
+  .mc-xp .bar { height: 6px; border-radius: 4px; background: var(--surface-2); overflow: hidden; } .mc-xp .bar i { display: block; height: 100%; background: var(--gold); border-radius: 4px; }
+  .home-tiles { margin-top: 12px; }
+  .home-tiles .tile { display: flex; align-items: center; gap: 12px; padding: 14px 12px; }
+  .home-tiles .tile small { display: none; }
+  .home-tiles .tile b { font-size: 15.5px; }
+  .m-stat { text-align: center; color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  .result { text-align: center; display: grid; gap: 14px; justify-items: center; padding-top: 20px; }
+  .result .score { font-family: var(--f-display); font-size: 56px; font-weight: 700; letter-spacing: -.03em; line-height: 1; }
+  .gain { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .pill { padding: 8px 12px; border-radius: 999px; font-weight: 700; font-size: 14px; }
+  .pill.gold { background: var(--gold-soft); color: var(--gold); }
+  .pill.green { background: var(--good-soft); color: var(--good); }
+  .pill.soft { background: var(--surface-2); }
+  .result .lines { display: grid; gap: 6px; width: 100%; }
+  .result .lines div { background: var(--surface); border-radius: var(--r-sm); padding: 10px 14px; display: flex; justify-content: space-between; box-shadow: var(--shadow); }
+  .new-badge { background: var(--gold-soft); color: var(--gold); border-radius: var(--r-md); padding: 12px 14px; width: 100%; font-weight: 700; }
+  .actions { display: grid; gap: 10px; width: 100%; margin-top: 6px; }
+
+  .sheet-wrap { position: fixed; inset: 0; background: rgba(8,20,17,.45); z-index: 45; display: flex; align-items: flex-end; justify-content: center; }
+  .sheet { background: var(--bg); width: 100%; max-width: 492px; border-radius: 24px 24px 0 0; padding: 18px 16px calc(20px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 12px; max-height: 85%; overflow-y: auto; }
+  .sheet h3 { margin: 0; font-family: var(--f-display); font-size: 17px; font-weight: 600; }
+  .sheet p { margin: 0; color: var(--muted); }
+  .grab { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 0 auto 4px; }
+  /* ✕ — har bir oynaning tepasida doim ko'rinib turadi (pastga tushmasdan yopish uchun) */
+  .sheet-x { position: sticky; top: -18px; justify-self: end; margin: -8px -4px -48px 0; z-index: 3; width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font-size: 17px; display: grid; place-items: center; box-shadow: 0 2px 10px rgba(0,0,0,.25); }
+  .input { width: 100%; padding: 14px; border-radius: 14px; border: 2px solid var(--line); background: var(--surface); font-size: 16px; }
+  .input:focus { border-color: var(--brand); outline: none; }
+  .toast { position: fixed; left: 50%; bottom: 100px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-weight: 600; font-size: 14px; z-index: 50; width: max-content; max-width: min(92vw, 420px); text-align: center; }
+
+  /* Ovoz yozish */
+  .rec { display: grid; gap: 10px; justify-items: center; background: var(--surface); border-radius: var(--r-lg); padding: 18px; box-shadow: var(--shadow); }
+  .rec-btn { width: 84px; height: 84px; border-radius: 50%; background: var(--bad); color: #fff; font-size: 34px; display: grid; place-items: center; box-shadow: 0 6px 18px rgba(195,63,55,.35); }
+  .rec-btn.stop { background: var(--ink); color: var(--bg); }
+  .rec-time { font-family: var(--f-display); font-size: 22px; font-variant-numeric: tabular-nums; }
+  .rec-live { width: 12px; height: 12px; border-radius: 50%; background: var(--bad); display: inline-block; margin-right: 6px; animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: .2; } }
+  .rec audio { width: 100%; }
+  .rec-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+  .sp-item { background: var(--surface-2); border-radius: 12px; padding: 10px 12px; display: grid; gap: 2px; }
+  .sp-item small { color: var(--muted); }
+  .stars { display: flex; gap: 6px; flex-wrap: wrap; }
+  .stars button { width: 44px; height: 40px; border-radius: 10px; background: var(--surface-2); font-weight: 700; }
+  .stars button[aria-pressed="true"] { background: var(--gold); color: #fff; }
+  textarea.input { min-height: 64px; resize: vertical; font-family: inherit; }
+  .rep-st { background: var(--surface); border-radius: var(--r-md); padding: 12px 14px; box-shadow: var(--shadow); display: grid; gap: 4px; }
+  .rep-st b { font-weight: 700; }
+  .rep-st small { color: var(--muted); }
+
+  /* O'rnatish taklifi */
+  .install { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; margin-top: 12px; padding: 12px 14px; border: 1.5px dashed var(--brand); }
+  .install img { border-radius: 12px; flex: none; }
+  .install span:nth-child(2) { flex: 1; }
+  .install b { display: block; }
+  .install small { color: var(--muted); }
+  .steps { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+
+  /* Reyting */
+  .board { padding: 6px 14px; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .row:last-child { border-bottom: 0; }
+  .rank { width: 26px; text-align: center; font-family: var(--f-display); font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
+  .ava { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: var(--brand-soft); color: var(--brand); flex: none; }
+  .row .name { flex: 1; min-width: 0; }
+  .row .name b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .xp { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .row.me { background: var(--brand-soft); margin-inline: -14px; padding-inline: 14px; border-radius: 12px; border-bottom-color: transparent; }
+  .champ { background: linear-gradient(150deg, #B87D0C, #E0A82E); color: #fff; border-radius: var(--r-lg); padding: 16px 18px; margin-bottom: 12px; box-shadow: var(--shadow); }
+  .champ small { display: block; opacity: .9; font-weight: 600; }
+  .champ b { font-family: var(--f-display); font-size: 18px; }
+
+  /* Duel oynasi */
+  .duel-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .duel-item:last-child { border-bottom: 0; }
+  .duel-item .t { flex: 1; min-width: 0; }
+  .duel-item .t b { display: block; }
+  .duel-item .t small { color: var(--muted); }
+  .duel-item .btn { padding: 9px 12px; }
+  .tag { padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+  .tag.win { background: var(--good-soft); color: var(--good); } .tag.lose { background: var(--bad-soft); color: var(--bad); } .tag.draw { background: var(--surface-2); }
+
+  /* Kirish */
+  .auth { position: fixed; inset: 0; z-index: 40; background: var(--bg); overflow-y: auto; padding: calc(24px + env(safe-area-inset-top, 0px)) 16px 24px; }
+  .auth-in { max-width: 420px; margin: 0 auto; display: grid; gap: 18px; }
+  .auth-brand { display: flex; gap: 12px; align-items: center; }
+  .auth-brand b { font-family: var(--f-display); font-size: 22px; display: block; }
+  .auth-brand small { color: var(--muted); }
+  .auth-tabs { margin: 0; }
+  .auth-tabs button { flex: 1; }
+  .auth-form { display: grid; gap: 8px; }
+  .auth-form label { font-weight: 600; margin-top: 6px; }
+  .auth-form label small { color: var(--muted); font-weight: 500; }
+  .input.pin { letter-spacing: .5em; font-size: 22px; text-align: center; font-variant-numeric: tabular-nums; }
+  .auth-err { margin: 4px 0 0; background: var(--bad-soft); color: var(--bad); padding: 10px 12px; border-radius: 12px; font-weight: 600; }
+
+  /* Ustoz paneli */
+  .teacher { position: fixed; inset: 0; z-index: 35; background: var(--bg); overflow-y: auto; padding: env(safe-area-inset-top, 0px) 16px 0; }
+  .tc-controls { display: grid; gap: 12px; }
+  .tc-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .tc-row small { display: block; }
+  .stepper { display: flex; align-items: center; gap: 10px; flex: none; }
+  .stepper .btn { width: 40px; height: 40px; padding: 0; font-size: 20px; }
+  .stepper b { font-family: var(--f-display); font-size: 18px; min-width: 22px; text-align: center; }
+  .tc-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+  .tc-stat { background: var(--surface); border-radius: var(--r-md); padding: 12px; box-shadow: var(--shadow); text-align: center; }
+  .tc-stat b { display: block; font-family: var(--f-display); font-size: 20px; font-variant-numeric: tabular-nums; }
+  .tc-stat small { color: var(--muted); font-size: 12px; }
+  .tc-list { display: grid; gap: 8px; }
+  .st { background: var(--surface); border-radius: var(--r-md); padding: 12px 14px; box-shadow: var(--shadow); display: grid; gap: 8px; }
+  .st-head { display: flex; align-items: center; gap: 10px; }
+  .st-head .name { flex: 1; min-width: 0; }
+  .st-head .name b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .st-head .name small { color: var(--muted); }
+  .spark { display: flex; align-items: flex-end; gap: 3px; height: 26px; flex: none; }
+  .spark i { width: 7px; border-radius: 2px; background: var(--brand); min-height: 2px; }
+  .spark i.zero { background: var(--line); }
+  .st-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+  .st-meta span { background: var(--surface-2); border-radius: 8px; padding: 3px 8px; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .st-actions { display: flex; gap: 6px; }
+  .st-actions .btn { padding: 7px 10px; font-size: 13px; }
+  .tc-tabs { margin: 0 0 12px; }
+  .tc-tabs button { flex: 1 0 auto; }
+  .tc-pass { display: grid; gap: 6px; margin-bottom: 12px; border: 1.5px dashed var(--gold); }
+  .tc-more { margin-top: 10px; padding: 12px 16px; }
+  .tc-more summary { cursor: pointer; font-weight: 700; list-style: none; display: flex; justify-content: space-between; gap: 8px; }
+  .tc-more summary::after { content: "▾"; color: var(--muted); }
+  .tc-more[open] summary::after { content: "▴"; }
+  .tc-more[open] summary { margin-bottom: 8px; }
+  .st-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; }
+  .st-row .name { flex: 1; min-width: 0; }
+  .st-row .name b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .st-row .name small { color: var(--muted); }
+  .st-row .xp { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .st-more { display: grid; gap: 8px; }
+  .rep-row { display: grid; grid-template-columns: 1fr auto auto auto; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  .rep-row b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rep-row small { color: var(--muted); text-align: right; }
+  .rep-d summary { list-style: none; cursor: pointer; }
+  .rep-d summary::-webkit-details-marker { display: none; }
+  .rep-d:last-child summary { border-bottom: 0; }
+  .rep-head { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+  .link-btn { color: var(--gold); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; padding: 6px; }
+  .hard { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+  .hard:last-child { border-bottom: 0; }
+
+  /* ===== Premium Dark uslubi (<html data-style="premium">) ===== */
+  :root[data-style="premium"] {
+    color-scheme: dark;
+    --bg: #0C1218; --surface: #141C25; --surface-2: #1C2631; --ink: #F2EDE1; --muted: #98A2AC; --line: #243040;
+    --brand: #D6A94E; --brand-2: #E6BE68; --brand-ink: #17120A; --brand-soft: #2B2417;
+    --gold: #E2B75C; --gold-soft: #2D2616; --gold-line: #5E4C25; --good: #3DBA8E; --good-soft: #10302A; --bad: #E7766C; --bad-soft: #3A1C1A;
+    --shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 10px 28px rgba(0,0,0,.35);
+  }
+  [data-style="premium"] body { background: radial-gradient(120% 60% at 50% -10%, #16303A 0%, transparent 60%), var(--bg); background-attachment: fixed; }
+  [data-style="premium"] .logo, [data-style="premium"] .big-ava { background: linear-gradient(160deg, #1D2733, #111820); color: var(--gold); border-color: var(--gold-line); }
+  [data-style="premium"] .mission { border-radius: var(--r-lg); padding: 138px 20px 22px; border: 1px solid var(--gold-line);
+    background: radial-gradient(90% 70% at 50% 0%, rgba(61,186,142,.22) 0%, transparent 70%), linear-gradient(180deg, #17222D 0%, #0F161E 100%); }
+  [data-style="premium"] .mission::before { display: none; }
+  [data-style="premium"] .mission::after { content: "لُغَةُ الضَّادِ"; width: auto; height: auto; top: 22px; padding: 14px 12px 4px; border: 0; border-radius: 0; background: none;
+    font-size: 58px; line-height: 1.5; white-space: nowrap; color: transparent; background-image: linear-gradient(180deg, #F3D48A, #B88A33); -webkit-background-clip: text; background-clip: text;
+    filter: drop-shadow(0 4px 16px rgba(214,169,78,.25)); }
+  [data-style="premium"] .eyebrow { color: var(--gold); }
+  [data-style="premium"] .dots i.on { background: var(--gold); }
+  [data-style="premium"] .tiles .ic { background: linear-gradient(160deg, #202B37, #151D26) !important; color: var(--gold); border-color: var(--gold-line); }
+  [data-style="premium"] .lesson.done .node { background: #10302A; color: var(--good); border-color: #1F5A48; }
+  [data-style="premium"] .tabbar { background: color-mix(in srgb, #0C1218 88%, transparent); }
+  [data-style="premium"] .tab[aria-current="page"] { color: var(--gold); }
+  [data-style="premium"] .champ { background: linear-gradient(150deg, #8A6A26, #D6A94E); }
+
+  /* ===== 🐪 Sahro uslubi (<html data-style="sahro">) — markaz sayti bilan bir xil: och qahva/qum, krem kartalar,
+     sahro ranglari (terrakota, voha, za'faron, palma), «bosiladigan» qalin tugmalar. Asosiy uslub (2026-10-06). ===== */
+  :root[data-style="sahro"] {
+    color-scheme: light;
+    --bg: #EBD9BC; --surface: #FFF8EC; --surface-2: #F4E8D3; --ink: #3B2614; --muted: #8A6E52; --line: #E2CBA4;
+    --brand: #2A9D8F; --brand-2: #23897D; --brand-ink: #FFFFFF; --brand-soft: #D7EEEA;
+    --gold: #B87A1E; --gold-soft: #F8E7C4; --gold-line: #E3C48A; --good: #4F8A2E; --good-soft: #E3EFD6; --bad: #C8553D; --bad-soft: #F7DDD5;
+    --shadow: 0 5px 0 rgba(107,68,35,.16);
+    --f-display: "Nunito", "Onest", system-ui, sans-serif;
+    --f-body: "Nunito", "Onest", "Amiri", system-ui, sans-serif;
+    --terra: #C8553D; --oasis: #2A9D8F; --saff: #E09A2B; --palm: #5B8C3A; --coffee: #6B4423; --coffee2: #4A2E17;
+  }
+  [data-style="sahro"] body { background: linear-gradient(#f7e7c6, #EBD9BC 45%) fixed; font-weight: 600; }
+  [data-style="sahro"] .hello strong, [data-style="sahro"] .section-title h3, [data-style="sahro"] .sheet h3 { font-weight: 900; color: var(--coffee2); }
+  [data-style="sahro"] .logo, [data-style="sahro"] .big-ava { background: var(--coffee); color: #FFF8EC; border: 2.5px solid var(--saff); border-radius: 50%; }
+  [data-style="sahro"] .chip { box-shadow: 0 3px 0 rgba(107,68,35,.18); font-weight: 900; }
+  [data-style="sahro"] .card, [data-style="sahro"] .tile, [data-style="sahro"] .rankline, [data-style="sahro"] .mcard { border: 0; border-radius: 18px; box-shadow: var(--shadow); }
+  /* Brend qatori (muhr + shior) — to'q qahva, xuddi markazning chap menyusi kabi */
+  [data-style="sahro"] .mission, [data-style="sahro"] .mission.brandrow { background: var(--coffee) repeating-linear-gradient(45deg, rgba(255,255,255,.03) 0 10px, transparent 10px 20px) !important;
+    border: 0 !important; border-radius: 18px !important; box-shadow: 0 6px 0 rgba(0,0,0,.18); }
+  [data-style="sahro"] .mission::before { display: none; }
+  [data-style="sahro"] .tb-motto2 { color: #F6D58A; }
+  [data-style="sahro"] .mcard.big { border: 0; box-shadow: 0 0 0 3px var(--saff), 0 6px 0 rgba(107,68,35,.2); }
+  [data-style="sahro"] .eyebrow { color: var(--terra); font-weight: 900; }
+  [data-style="sahro"] .btn { font-weight: 900; border-radius: 14px; }
+  [data-style="sahro"] .btn-brand { background: var(--oasis); box-shadow: 0 5px 0 #1d6f65; }
+  [data-style="sahro"] .btn-brand:active { transform: translateY(3px); box-shadow: 0 2px 0 #1d6f65; }
+  [data-style="sahro"] .btn-light { background: linear-gradient(180deg, #F2B84B, #E09A2B); color: #2a1700; box-shadow: 0 5px 0 #9a6413; }
+  [data-style="sahro"] .btn-soft { background: var(--surface-2); color: var(--coffee); box-shadow: 0 4px 0 #dcc7a6; }
+  /* Mashg'ulot tugmalari — har biri o'z sahro rangida */
+  [data-style="sahro"] .tiles .ic { border: 0 !important; color: #fff !important; }
+  [data-style="sahro"] .tiles .ic.blue { background: var(--oasis) !important; } [data-style="sahro"] .tiles .ic.red { background: var(--terra) !important; }
+  [data-style="sahro"] .tiles .ic.gold { background: var(--saff) !important; } [data-style="sahro"] .tiles .ic.green { background: var(--palm) !important; }
+  [data-style="sahro"] .tile b { font-weight: 900; color: var(--coffee2); }
+  [data-style="sahro"] .tabbar { background: color-mix(in srgb, #FFF8EC 94%, transparent); border-top: 0; box-shadow: 0 -4px 14px rgba(107,68,35,.12); }
+  [data-style="sahro"] .tab { font-weight: 800; color: var(--muted); }
+  [data-style="sahro"] .tab[aria-current="page"] { color: var(--terra); }
+  [data-style="sahro"] .champ { background: linear-gradient(150deg, #C8553D, #E09A2B); }
+  [data-style="sahro"] .opt { border: 0; box-shadow: 0 4px 0 rgba(107,68,35,.16); font-weight: 800; }
+  [data-style="sahro"] .lesson.done .node { background: var(--good-soft); color: var(--good); border-color: #bcd6a6; }
+
+
+  /* ---------- Darslar: ikki bo'lim — quyosh = Grammatika, oy = Fonetika (Mundil.uz: to'q yashil + to'q oltin; ustoz, 2026-10-12) ---------- */
+  .sky { position: relative; border-radius: 22px; overflow: hidden; background: radial-gradient(circle at 12% 14%, #F3D98B 0 1.2px, transparent 1.8px), radial-gradient(circle at 88% 9%, #F3D98B 0 1.4px, transparent 2px), radial-gradient(circle at 50% 6%, #F3D98B 0 1px, transparent 1.6px), radial-gradient(circle at 30% 30%, #F3D98B 0 .9px, transparent 1.5px), radial-gradient(circle at 70% 36%, #F3D98B 0 1px, transparent 1.6px), radial-gradient(circle at 94% 44%, #F3D98B 0 1px, transparent 1.6px), radial-gradient(circle at 6% 50%, #F3D98B 0 1px, transparent 1.6px), linear-gradient(#03120D, #06281F 40%, #0B3D2E 68%, #1F5A40 86%, #5E6A2E); margin: 4px 0 14px; box-shadow: 0 6px 0 rgba(4,20,15,.35), 0 14px 26px rgba(4,20,15,.25); font-family: "Nunito", sans-serif; }
+  .sky-scene { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; aspect-ratio: 400 / 150; -webkit-mask-image: linear-gradient(to bottom, transparent, #000 22%); mask-image: linear-gradient(to bottom, transparent, #000 22%); }
+  .sky-in { position: relative; z-index: 1; padding: 14px 12px calc(37.5% - 14px); }
+  .sky-brand { text-align: center; font-family: "Lora", Georgia, serif; font-weight: 700; font-size: 22px; line-height: 1; margin-bottom: 16px;
+    background: linear-gradient(180deg, #F3D98B, #D4A63A 55%, #A87B1F); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .sky-brand i { font-style: normal; font-size: .64em; }
+  .sky-orbs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; max-width: 380px; margin: 0 auto; }
+  .orb { background: none; border: 0; padding: 0; display: grid; justify-items: center; gap: 0; color: #F6EBCB; cursor: pointer; text-align: center; font: inherit; opacity: .62; transition: opacity .2s, transform .2s; transform: scale(.9); }
+  .orb[aria-pressed="true"] { opacity: 1; transform: scale(1); }
+  .orb .disc { position: relative; width: min(29vw, 112px); aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; transition: transform .14s; margin-bottom: 9px; }
+  .orb:active .disc { transform: scale(.94); }
+  .orb .disc b { position: relative; z-index: 2; font-size: clamp(13px, 4.3vw, 18px); font-weight: 900; letter-spacing: -.01em; color: #0B3D2E; text-shadow: 0 1px 0 rgba(255,255,255,.35); }
+  .orb.moon .disc { background: radial-gradient(circle at 34% 30%, #FFFDF0 0%, #F1E7C1 46%, #CFC08A 78%, #A99A62 100%); box-shadow: 0 0 0 5px rgba(255,248,214,.07), 0 0 34px 6px rgba(255,244,200,.32), inset -13px -10px 0 rgba(6,40,31,.20); }
+  .orb.moon[aria-pressed="true"] .disc { animation: sky-float 7s ease-in-out infinite; }
+  .orb.moon .disc::before { content: ""; position: absolute; inset: 0; border-radius: 50%; opacity: .5;
+    background: radial-gradient(circle at 24% 66%, rgba(120,104,52,.55) 0 7%, transparent 8%), radial-gradient(circle at 70% 22%, rgba(120,104,52,.5) 0 5%, transparent 6%), radial-gradient(circle at 76% 72%, rgba(120,104,52,.45) 0 9%, transparent 10%), radial-gradient(circle at 40% 16%, rgba(120,104,52,.4) 0 3.5%, transparent 4.5%); }
+  .orb.sun .disc { background: radial-gradient(circle at 40% 34%, #FFF6C9 0%, #F5CF62 40%, #D4A63A 72%, #A87B1F 100%); box-shadow: 0 0 0 5px rgba(240,194,75,.10), 0 0 44px 10px rgba(240,194,75,.46), inset -8px -8px 0 rgba(120,80,10,.16); }
+  .orb.sun .disc::before { content: ""; position: absolute; inset: -22%; border-radius: 50%; z-index: -1; animation: sky-spin 50s linear infinite;
+    background: repeating-conic-gradient(from 0deg, rgba(240,194,75,.55) 0 7deg, transparent 7deg 22.5deg);
+    -webkit-mask-image: radial-gradient(circle, transparent 55%, #000 57%, #000 66%, transparent 86%); mask-image: radial-gradient(circle, transparent 55%, #000 57%, #000 66%, transparent 86%); }
+  .orb .ar { font-family: var(--f-ar, "Amiri", serif); font-size: 20px; line-height: 1.4; color: #E7C566; text-shadow: 0 2px 8px rgba(0,0,0,.6); }
+  .orb small { display: none; }
+  @keyframes sky-float { 50% { transform: translateY(-5px); } }
+  @keyframes sky-spin { to { transform: rotate(360deg); } }
+  .sky-camels { animation: sky-walk 60s linear infinite alternate; } @keyframes sky-walk { from { transform: translateX(14px); } to { transform: translateX(-22px); } }
+  .sky-star { animation: sky-tw 3.2s ease-in-out infinite; } .sky-star:nth-child(2n) { animation-delay: 1.1s; } .sky-star:nth-child(3n) { animation-delay: 2s; }
+  @keyframes sky-tw { 50% { opacity: .2; } }
+
+  /* ---------- 🌙 Fonetika: «Yulduzlar yo'li» va harf darsi (tungi yashil + oltin) ---------- */
+  .fon-sky { background: linear-gradient(175deg, #06281F, #0B3D2E 60%, #0E4A37); border-radius: 22px; padding: 16px 12px 14px; color: #F6EBCB; font-family: "Nunito", sans-serif; box-shadow: 0 5px 0 rgba(4,20,15,.3); }
+  .fs-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 0 4px; } .fs-head b { font-family: "Lora", Georgia, serif; font-size: 19px; color: #E7C566; } .fs-head span { font-size: 13px; font-weight: 800; color: #D9CDA6; }
+  .fs-note { margin: 6px 4px 12px; font-size: 13px; color: #CFC5A2; } .fs-grid + .fs-note { margin: 12px 4px 0; text-align: center; font-size: 12px; }
+  .fs-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; direction: rtl; }
+  .fs-star { border: 0; border-radius: 18px; padding: 9px 2px 7px; display: grid; justify-items: center; gap: 0; cursor: pointer; background: rgba(255,255,255,.05); color: #7F9488; font: inherit; }
+  .fs-star .ar { font-family: var(--f-ar, "Amiri", serif); font-size: 30px; line-height: 1.25; } .fs-star small { font-size: 10.5px; font-weight: 800; direction: ltr; }
+  .fs-star.done { background: radial-gradient(circle at 50% 35%, #F5CF62, #C9982F); color: #0B3D2E; box-shadow: 0 0 18px rgba(240,194,75,.45), 0 4px 0 #8E6A1A; } .fs-star.done small { font-size: 13px; }
+  .fs-star.open { background: #F6EBCB; color: #0B3D2E; box-shadow: 0 0 0 3px #E7C566, 0 4px 0 #8E6A1A; animation: fs-pulse 2.2s ease-in-out infinite; }
+  .fs-star.locked { color: #9FB3A6; } .fs-star.soon { opacity: .5; }
+  @keyframes fs-pulse { 50% { box-shadow: 0 0 0 7px rgba(231,197,102,.3), 0 4px 0 #8E6A1A; } }
+  .fon { position: fixed; inset: 0; z-index: 12; overflow-y: auto; background: linear-gradient(175deg, #03120D, #06281F 35%, #0B3D2E); color: #F6EBCB; font-family: "Nunito", sans-serif; padding: calc(10px + env(safe-area-inset-top, 0px)) 16px calc(28px + env(safe-area-inset-bottom, 0px)); }
+  .fon-in { max-width: 480px; margin: 0 auto; display: grid; gap: 12px; }
+  .fn-top { display: flex; align-items: center; gap: 10px; } .fn-top b { flex: 1; font-family: "Lora", Georgia, serif; font-size: 20px; color: #E7C566; } .fn-top .ar { font-family: var(--f-ar, "Amiri", serif); font-size: 30px; line-height: 1; color: #F3D98B; }
+  .fn-x { width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(255,255,255,.1); color: #F6EBCB; font-size: 17px; cursor: pointer; }
+  .fn-steps { display: flex; gap: 6px; } .fn-steps i { flex: 1; font-style: normal; text-align: center; font-size: 15px; padding: 5px 0; border-radius: 10px; background: rgba(255,255,255,.06); filter: grayscale(1); opacity: .55; }
+  .fn-steps i.on { background: rgba(231,197,102,.25); filter: none; opacity: 1; } .fn-steps i.cur { outline: 2px solid #E7C566; filter: none; opacity: 1; }
+  .fn-title { margin: 4px 0 0; font-size: 18px; font-weight: 900; color: #FFF6DA; }
+  #fn-body { display: grid; gap: 12px; }
+  .fn-letter { font-family: var(--f-ar, "Amiri", serif); font-size: 120px; line-height: 1.25; text-align: center; color: #F3D98B; text-shadow: 0 0 30px rgba(240,194,75,.45); }
+  .fn-forms { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; direction: rtl; } .fn-forms div { background: rgba(255,255,255,.07); border-radius: 14px; padding: 6px 2px 8px; text-align: center; }
+  .fn-forms .ar { display: block; font-family: var(--f-ar, "Amiri", serif); font-size: 34px; line-height: 1.5; color: #FFF6DA; } .fn-forms small { font-size: 11px; font-weight: 700; color: #CFC5A2; direction: ltr; display: block; }
+  .fn-card { background: rgba(255,255,255,.07); border-radius: 16px; padding: 10px 14px; } .fn-card small { font-weight: 800; color: #E7C566; font-size: 12.5px; } .fn-card p { margin: 3px 0 0; font-size: 15px; line-height: 1.45; } .fn-card.tip { background: rgba(231,197,102,.13); }
+  .fn-hk { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .fn-hk div { background: rgba(255,255,255,.07); border-radius: 14px; padding: 8px 10px; display: grid; gap: 1px; }
+  .fn-hk .ar { font-family: var(--f-ar, "Amiri", serif); font-size: 40px; line-height: 1.5; color: #F3D98B; text-align: center; } .fn-hk b { font-size: 14.5px; } .fn-hk small { font-size: 12px; color: #CFC5A2; line-height: 1.3; }
+  .fn-ask { margin: 2px 0 0; font-size: 15.5px; font-weight: 800; color: #FFF6DA; }
+  .fn-syll, .fn-words, .fn-choice { display: grid; gap: 10px; direction: rtl; } .fn-syll { grid-template-columns: repeat(3, 1fr); } .fn-words { grid-template-columns: repeat(3, minmax(0, 1fr)); } .fn-choice { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .fn-syll button, .fn-words button, .fn-choice button { border: 0; border-radius: 16px; background: #F6EBCB; color: #0B3D2E; font-family: var(--f-ar, "Amiri", serif); font-size: 34px; line-height: 1.7; padding: 6px 2px; cursor: pointer; box-shadow: 0 4px 0 #8E6A1A; transition: transform .1s; }
+  .fn-words button { font-size: 28px; } .fn-choice button { font-size: 30px; }
+  .fn-syll button:active, .fn-words button:active, .fn-choice button:active { transform: translateY(3px); box-shadow: 0 1px 0 #8E6A1A; }
+  .fn-syll button.on, .fn-words button.on, .fon button.good { background: linear-gradient(#F5CF62, #D4A63A); box-shadow: 0 4px 0 #8E6A1A, 0 0 16px rgba(240,194,75,.4); }
+  .fon button.bad { background: #E58F7B !important; animation: fn-shake .35s; } @keyframes fn-shake { 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+  .fn-play { justify-self: center; width: 96px; height: 96px; border-radius: 50%; border: 0; font-size: 40px; cursor: pointer; background: radial-gradient(circle at 35% 30%, #FFFDF0, #E9DDB0 60%, #BFAF78); box-shadow: 0 0 34px rgba(255,244,200,.35), inset -9px -7px 0 rgba(6,40,31,.16); }
+  .fn-parts { direction: rtl; display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap; font-family: var(--f-ar, "Amiri", serif); } .fn-parts span { background: rgba(255,255,255,.1); border-radius: 14px; font-size: 38px; line-height: 1.6; padding: 0 16px; color: #F3D98B; } .fn-parts i { font-style: normal; font-size: 24px; color: #CFC5A2; }
+  .fn-row { background: rgba(255,255,255,.07); border-radius: 16px; padding: 10px 12px; display: grid; gap: 8px; } .fn-q { font-weight: 800; font-size: 14.5px; } .fn-q .big { font-family: var(--f-ar, "Amiri", serif); font-size: 46px; line-height: 1.4; color: #F3D98B; display: block; text-align: center; }
+  .fn-opts { display: flex; gap: 8px; flex-wrap: wrap; } .fn-opts button { flex: 1; min-width: 0; border: 0; border-radius: 12px; background: #F6EBCB; color: #0B3D2E; font: inherit; font-weight: 900; font-size: 14px; padding: 9px 4px; cursor: pointer; box-shadow: 0 3px 0 #8E6A1A; } .fn-opts button i { display: block; font-style: normal; font-weight: 700; font-size: 11.5px; opacity: .75; }
+  .fn-row.ok button:not(.good) { opacity: .35; }
+  .fn-stable { display: grid; gap: 8px; } .fn-srow { background: rgba(255,255,255,.07); border-radius: 14px; padding: 8px 10px; } .fn-srow small { font-size: 12px; font-weight: 800; color: #CFC5A2; } .fn-srow > div { display: flex; gap: 6px; margin-top: 5px; }
+  .fn-srow span { flex: 1; min-width: 0; border-radius: 10px; padding: 6px 4px; text-align: center; background: rgba(255,255,255,.05); color: #7F9488; display: grid; } .fn-srow span b { font-size: 13.5px; } .fn-srow span i { font-style: normal; font-size: 11.5px; } .fn-srow span em { font-style: normal; font-size: 11px; line-height: 1.2; margin-top: 2px; }
+  .fn-srow span.on { background: linear-gradient(#F5CF62, #D4A63A); color: #0B3D2E; }
+  .fn-cv { width: min(100%, 320px); aspect-ratio: 1; justify-self: center; border-radius: 22px; background: rgba(255,255,255,.07); border: 2px dashed rgba(231,197,102,.4); touch-action: none; }
+  .fn-next, .fn-ghost { border: 0; border-radius: 16px; font: inherit; font-weight: 900; font-size: 16.5px; padding: 14px; cursor: pointer; width: 100%; }
+  .fn-next { background: linear-gradient(#F5CF62, #D4A63A); color: #0B3D2E; box-shadow: 0 5px 0 #8E6A1A; margin-top: 4px; } .fn-next:disabled { background: rgba(255,255,255,.1); color: #7F9488; box-shadow: none; cursor: default; }
+  .fn-ghost { background: rgba(255,255,255,.1); color: #F6EBCB; font-size: 15px; padding: 11px; }
+  .fn-done { display: grid; gap: 10px; justify-items: center; text-align: center; padding-top: 6vh; } .fn-done h3 { margin: 0; font-family: "Lora", Georgia, serif; font-size: 26px; color: #E7C566; } .fn-done p { margin: 0 0 8px; font-size: 15.5px; }
+  .fn-bigstar { font-size: 150px; line-height: 1; color: #F5CF62; text-shadow: 0 0 50px rgba(240,194,75,.8); animation: fn-pop .7s cubic-bezier(.2,1.6,.4,1); } @keyframes fn-pop { from { transform: scale(0) rotate(-40deg); } }
+  .fn-bigletter { font-family: var(--f-ar, "Amiri", serif); font-size: 54px; line-height: 1; color: #0B3D2E; margin-top: -112px; margin-bottom: 52px; position: relative; }
+
+  /* ---------- 🟢 Mundil.uz uslubi (MAKET, 2026-10-17): to'q yashil + to'q oltin. Hozircha hech kimga yoqilmagan ---------- */
+  :root[data-style="mundil"] {
+    color-scheme: light;
+    --bg: #EEF0E4; --surface: #FFFDF6; --surface-2: #E8EADB; --ink: #10261D; --muted: #5E6E62; --line: #D6DCC6;
+    --brand: #0B3D2E; --brand-2: #0F4D3A; --brand-ink: #FFFFFF; --brand-soft: #DCEBE2;
+    --gold: #B8902F; --gold-soft: #F6ECCB; --gold-line: #DCC27A; --good: #2F7A4A; --good-soft: #DDEFE2; --bad: #B4472F; --bad-soft: #F6DDD5;
+    --shadow: 0 5px 0 rgba(11,61,46,.14);
+    --f-display: "Nunito", "Onest", system-ui, sans-serif; --f-body: "Nunito", "Onest", "Amiri", system-ui, sans-serif;
+    --mg: #0B3D2E; --mg2: #06281F; --mgold: #C9982F; --mgold2: #E7C566;
+  }
+  [data-style="mundil"] body { background: linear-gradient(#F6F5EA, #EEF0E4 45%) fixed; font-weight: 600; }
+  [data-style="mundil"] .hello strong, [data-style="mundil"] .section-title h3, [data-style="mundil"] .sheet h3 { font-weight: 900; color: var(--mg); }
+  [data-style="mundil"] .section-title h3::before { background: var(--mgold); }
+  [data-style="mundil"] .hello .logo { display: none; }
+  [data-style="mundil"] .big-ava { background: var(--mg); color: #FFF6DA; border: 2.5px solid var(--mgold); border-radius: 50%; }
+  [data-style="mundil"] .chip { box-shadow: 0 3px 0 rgba(11,61,46,.15); font-weight: 900; }
+  [data-style="mundil"] .card, [data-style="mundil"] .tile, [data-style="mundil"] .rankline, [data-style="mundil"] .mcard { border: 0; border-radius: 18px; box-shadow: var(--shadow); }
+  /* Brend qatori: muhr va shior o'rniga oltin «Mundil.uz» */
+  [data-style="mundil"] .mission, [data-style="mundil"] .mission.brandrow { background: linear-gradient(160deg, var(--mg2), var(--mg) 70%) !important; border: 0 !important; border-radius: 18px !important; box-shadow: 0 6px 0 rgba(0,0,0,.18); }
+  [data-style="mundil"] .mission::before { display: none; }
+    .mz-brand { display: block; width: 100%; text-align: center; font-family: "Lora", Georgia, serif; font-weight: 700; font-size: 34px; line-height: 1.15; padding: 6px 0;
+    background: linear-gradient(180deg, #F3D98B, #D4A63A 55%, #A87B1F); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .mz-brand i { font-style: normal; font-size: .62em; }
+  [data-style="mundil"] .mcard.big { border: 0; box-shadow: 0 0 0 3px var(--mgold), 0 6px 0 rgba(11,61,46,.18); }
+  [data-style="mundil"] .eyebrow { color: var(--mgold); font-weight: 900; }
+  [data-style="mundil"] .btn { font-weight: 900; border-radius: 14px; }
+  [data-style="mundil"] .btn-brand { background: var(--mg); box-shadow: 0 5px 0 #031a13; }
+  [data-style="mundil"] .btn-brand:active { transform: translateY(3px); box-shadow: 0 2px 0 #031a13; }
+  [data-style="mundil"] .btn-light { background: linear-gradient(180deg, #E7C566, #C9982F); color: #10261D; box-shadow: 0 5px 0 #8E6A1A; }
+  [data-style="mundil"] .btn-soft { background: var(--surface-2); color: var(--mg); box-shadow: 0 4px 0 #cfd5bd; }
+  [data-style="mundil"] .tiles .ic { border: 0 !important; color: #fff !important; }
+  [data-style="mundil"] .tiles .ic.blue, [data-style="mundil"] .tiles .ic.green { background: var(--mg) !important; }
+  [data-style="mundil"] .tiles .ic.red, [data-style="mundil"] .tiles .ic.gold { background: linear-gradient(160deg, #D9B14E, #B8902F) !important; }
+  [data-style="mundil"] .tile b { font-weight: 900; color: var(--mg); }
+  [data-style="mundil"] .tabbar { background: color-mix(in srgb, #FFFDF6 95%, transparent); border-top: 0; box-shadow: 0 -4px 14px rgba(11,61,46,.12); }
+  [data-style="mundil"] .tab { font-weight: 800; color: var(--muted); }
+  [data-style="mundil"] .tab[aria-current="page"] { color: var(--mg); }
+  [data-style="mundil"] .champ { background: linear-gradient(150deg, var(--mg), #2F7A4A); }
+  [data-style="mundil"] .opt { border: 0; box-shadow: 0 4px 0 rgba(11,61,46,.14); font-weight: 800; }
+  [data-style="mundil"] .kv-ban { background: linear-gradient(135deg, #C9982F, #0F4D3A 85%); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- BOSH SAHIFA -->
+  <section id="screen-home">
+    <header class="top">
+      <div class="hello">
+        <div class="logo logo-img" aria-hidden="true"><img src="icon-192.png" alt=""></div>
+        <div style="min-width:0"><small>Assalomu alaykum,</small><strong id="h-name"></strong></div>
+      </div>
+      <div class="chips">
+        <button class="chip theme-tg" id="theme-tg" hidden aria-label="Yorug' / qorong'u ko'rinish">☀️</button>
+        <span class="chip fire" id="chip-fire" title="Ketma-ket kunlar">🔥 <span id="h-streak">0</span></span>
+        <span class="chip" title="Jami XP">⭐ <span id="h-xp">0</span></span>
+      </div>
+    </header>
+
+    <!-- «Tozalangan» bosh sahifa (2026-10-05): muhr kichik, shior bilan bitta qatorda -->
+    <article class="mission brandrow">
+      <div class="tb-hero">
+        <div class="mz-brand" aria-hidden="true">Mundil<i>.uz</i></div>
+      </div>
+    </article>
+
+    <!-- Kunlik missiya — brend yuzidan alohida, ixcham karta (ustoz taklifi) -->
+    <!-- Kunlik missiya: chapda 🌙 Fonetika, o'ngda ☀️ Grammatika (ustoz, 2026-10-17) -->
+    <div class="mcard big">
+      <small class="eyebrow">🎯 Kunlik missiya</small>
+      <div class="mc-two">
+        <div class="mc-half"><b>🌙 Fonetika</b><small id="mf-title"></small><button class="btn btn-light mc-go" id="mf-start"></button></div>
+        <div class="mc-half"><b>☀️ Grammatika</b><small id="m-title"></small><button class="btn btn-light mc-go" id="m-start"></button></div>
+      </div>
+      <span id="m-sub" hidden></span><div class="dots" id="m-dots" hidden aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="mc-xp" id="m-xp"></div>
+    </div>
+
+    <div id="world-card" hidden></div>
+    <div id="chests" hidden></div>
+
+    <button class="card install" id="install" hidden>
+      <img src="icon-192.png" alt="" width="44" height="44">
+      <span><b>📲 Telefonga o'rnating</b><small>Mundil.uz ekraningizda alohida ilova bo'lib turadi, bir bosishda ochiladi</small></span>
+      <span aria-hidden="true">→</span>
+    </button>
+
+    <div id="kv-banner" style="margin-top:12px"></div>
+    <div class="tiles home-tiles">
+      <button class="tile" data-act="listen"><span class="ic blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4" height="6" rx="1.5"/><rect x="17" y="14" width="4" height="6" rx="1.5"/></svg></span><span><b>Tinglash</b><small>Eshiting va toping</small></span></button>
+      <button class="tile" data-act="speak"><span class="ic gold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg></span><span><b>Gapirish <span class="badge-count" id="speak-count" hidden></span></b><small>Ovoz yozing, ustoz baholaydi</small></span></button>
+      <button class="tile" data-act="duel"><span class="ic green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/><path d="M14.5 6.5 18 3h3v3l-3.5 3.5M5 14l4 4M7 17l-3 3M3 19l2 2"/></svg></span><span><b>Duel <span class="badge-count" id="duel-count" hidden></span></b><small>Guruhdoshni chaqiring</small></span></button>
+      <button class="tile" data-act="review"><span class="ic red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg></span><span><b>Xatolarim <span class="badge-count" id="mist-count" hidden></span></b><small>Takrorlab tuzating</small></span></button>
+    </div>
+
+    <div class="section-title"><h3>☀️ Kun so'zi</h3><span id="wotd-note">+5 XP</span></div>
+    <article class="card" id="wotd"></article>
+  </section>
+
+  <!-- DARSLAR -->
+  <section id="screen-today" hidden>
+    <div class="section-title" style="margin-top:4px"><h3>📅 Bugun</h3><span>Kunlik topshiriqlar</span></div>
+    <div id="today-box" class="today"></div>
+  </section>
+
+  <section id="screen-lessons" hidden>
+    <!-- Ikki bo'lim: quyosh = Grammatika (hozirgi darslar), oy = Fonetika -->
+    <div class="sky">
+      <svg class="sky-scene" viewBox="0 584 400 150" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+    <defs>
+      <linearGradient id="hb-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#03120D"/><stop offset=".3" stop-color="#06281F"/><stop offset=".55" stop-color="#0B3D2E"/><stop offset=".7" stop-color="#1F5A40"/><stop offset=".78" stop-color="#6E6A2C"/><stop offset=".84" stop-color="#C79A36"/></linearGradient>
+      <radialGradient id="hb-glow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#F3D98B" stop-opacity=".55"/><stop offset=".5" stop-color="#D4A63A" stop-opacity=".22"/><stop offset="1" stop-color="#D4A63A" stop-opacity="0"/></radialGradient>
+      <linearGradient id="hb-far" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8E7426"/><stop offset="1" stop-color="#6B5519"/></linearGradient>
+      <linearGradient id="hb-d1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#CFA23B"/><stop offset=".55" stop-color="#9C7422"/><stop offset="1" stop-color="#5E4413"/></linearGradient>
+      <linearGradient id="hb-d2" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E0B549"/><stop offset=".5" stop-color="#B0842A"/><stop offset="1" stop-color="#5A4012"/></linearGradient>
+      <linearGradient id="hb-d3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9A7424"/><stop offset=".45" stop-color="#5E4413"/><stop offset="1" stop-color="#1C1406"/></linearGradient>
+      <linearGradient id="hb-shade" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1A1204" stop-opacity=".6"/><stop offset="1" stop-color="#1A1204" stop-opacity="0"/></linearGradient>
+      <symbol id="hb-camel" viewBox="0 0 100 80"><path d="M18 42C20 37 24 35 28 34 31 22 37 13 45 13 53 13 57 22 59 32 63 37 70 40 76 38 79 34 80 26 84 18 86 14 92 14 95 18L96 22C93 24 90 24 87 24 84 30 82 40 76 48 72 52 68 53 66 54L66 78 63 78 62 56 59 56 58 78 55 78 54 55 37 55 36 78 33 78 32 55 29 55 28 78 25 78 24 54C20 52 18 48 18 40Z"/><path d="M18 40C14 44 13 50 14 56L16 56C16 50 17 46 19 43Z"/></symbol>
+      <symbol id="hb-palm" viewBox="0 0 60 90"><path d="M29 88C30 70 31 50 30 30L33 30C35 50 34 70 33 88Z"/><path d="M31 30C22 18 10 16 2 22 12 20 20 24 28 32ZM31 30C40 18 52 16 58 22 48 20 40 24 33 32ZM31 30C28 16 20 6 10 4 18 10 24 18 29 31ZM31 30C34 16 42 6 52 4 44 10 38 18 33 31ZM31 30C24 26 12 30 6 40 14 32 22 30 29 32ZM31 30C38 26 50 30 56 40 48 32 40 30 33 32Z"/></symbol>
+    </defs>
+    <rect width="400" height="800" fill="url(#hb-sky)"/>
+    
+    <ellipse cx="200" cy="640" rx="260" ry="110" fill="url(#hb-glow)"/>
+    <path d="M0 612C50 592 96 598 140 588S230 566 276 582 356 604 400 594V800H0Z" fill="url(#hb-far)" opacity=".85"/>
+    <path d="M0 650C40 626 92 616 150 634 196 648 232 674 290 660 330 650 366 628 400 636V800H0Z" fill="url(#hb-d1)"/>
+    <path d="M150 634C196 648 232 674 290 660 256 682 222 716 196 800H100C122 730 140 676 150 634Z" fill="url(#hb-shade)"/>
+    <g class="sky-camels" fill="#04160F">
+      <path d="M152 618a3.6 3.6 0 1 1 .1 0zM149 622h6l2 14-3 1v19h-2.4v-17h-1v17H148v-19l-2-1z"/>
+      <use href="#hb-camel" x="166" y="607" width="52" height="42"/><use href="#hb-camel" x="222" y="615" width="46" height="37"/><use href="#hb-camel" x="272" y="623" width="41" height="33"/><use href="#hb-camel" x="318" y="627" width="36" height="29"/>
+      <path d="M157 627l14 5M216 634l9 6M266 640l8 5M312 645l8 2" stroke="#04160F" stroke-width="1" fill="none"/>
+    </g>
+    <path d="M0 712C60 680 120 676 176 694 226 710 262 736 320 722 352 714 380 700 400 704V800H0Z" fill="url(#hb-d2)"/>
+    <path d="M176 694C226 710 262 736 320 722 290 742 262 770 244 800H130C150 760 166 722 176 694Z" fill="url(#hb-shade)" opacity=".8"/>
+    <g fill="none" stroke="#F3D98B" stroke-opacity=".2" stroke-width="1.2"><path d="M10 728q60-26 130-16"/><path d="M4 750q70-30 150-14"/><path d="M300 744q50-10 96-24"/></g>
+    <g fill="#03110C"><use href="#hb-palm" x="-10" y="640" width="92" height="138"/><use href="#hb-palm" x="42" y="676" width="62" height="94"/><use href="#hb-palm" x="338" y="680" width="68" height="102"/></g>
+    <path d="M0 772C70 750 150 760 210 774 270 788 330 780 400 762V800H0Z" fill="url(#hb-d3)"/>
+  </svg>
+      <div class="sky-in">
+        <div class="sky-brand">Mundil<i>.uz</i></div>
+        <div class="sky-orbs" role="group" aria-label="Bo'limni tanlang">
+          <button class="orb sun" data-course="gram" aria-pressed="true"><span class="disc"><b>Grammatika</b></span><span class="ar">الْقَوَاعِدُ</span><small>Darslar xaritasi</small></button>
+          <button class="orb moon" data-course="fon" aria-pressed="false"><span class="disc"><b>Fonetika</b></span><span class="ar">الْأَصْوَاتُ</span><small>Harflar va talaffuz</small></button>
+        </div>
+      </div>
+    </div>
+    <div id="course-gram">
+      <div class="section-title" style="margin-top:4px"><h3>🧭 Darajalar xaritasi</h3><span>المنهج العالمي · CEFR</span></div>
+      <div class="lvmap" id="lvmap"></div>
+    </div>
+    <div id="course-fon" hidden><div class="fon-sky" id="fon-sky"></div></div>
+  </section>
+
+  <!-- REYTING -->
+  <section id="screen-top" hidden>
+    <div class="section-title" style="margin-top:4px"><h3>🏆 Reyting</h3><span id="t-note"></span></div>
+    <div class="seg" role="group" aria-label="Reyting turi">
+      <button type="button" data-board="week" aria-pressed="true">📅 Haftalik · guruh</button>
+      <button type="button" data-board="month" aria-pressed="false">🌍 Oylik · hamma</button>
+      <button type="button" data-board="year" aria-pressed="false">🏆 Yillik</button>
+      <button type="button" data-board="journal" aria-pressed="false" hidden>📒 Jurnal</button>
+    </div>
+    <div class="champ" id="t-champ" hidden></div>
+    <div class="card board" id="t-board"><p class="muted">Yuklanmoqda…</p></div>
+    <p class="muted" style="font-size:12.5px;text-align:center;margin-top:14px">Mashqlardan kuniga ko'pi bilan 700 XP yoziladi.<br>Bonuslar (missiya, duel, kun so'zi, imtihon) alohida.</p>
+  </section>
+
+  <!-- LUG'AT -->
+  <section id="screen-words" hidden>
+    <div class="section-title" style="margin-top:4px"><h3>📒 Lug'at</h3><span>So'zni bosing, eshiting</span></div>
+    <button class="cards-btn" id="w-cards" hidden></button>
+    <div class="seg" id="w-seg" role="group" aria-label="Darsni tanlang"></div>
+    <div class="toolbar">
+      <span class="muted" id="w-count"></span>
+      <button class="btn btn-soft" id="w-hide" style="padding:8px 12px">🙈 Ma'nosini yashirish</button>
+    </div>
+    <div class="words" id="w-list"></div>
+    <div class="section-title"><h3>💬 Iboralar va suhbat</h3></div>
+    <div class="phrases" id="w-phrases"></div>
+  </section>
+
+  <!-- PROFIL -->
+  <section id="screen-profile" hidden>
+    <div class="card profile-card">
+      <button class="big-ava" id="p-ava" aria-label="Avatarni o'zgartirish"></button>
+      <button class="link-btn" id="p-ava-edit">🧑‍🎨 Avatarimni yaratish</button>
+      <div style="font-family:var(--f-display);font-weight:600;font-size:18px" id="p-name"></div>
+      <span class="rank-title" id="p-rank" hidden></span>
+      <span class="rank-title" id="p-sardor" hidden>🏅 Karvon sardori</span>
+      <div class="rankline" id="rankline" style="width:100%;box-sizing:border-box;box-shadow:none;background:var(--surface-2)"></div>
+      <div class="stats">
+        <div class="stat"><b id="p-xp"></b><small>XP</small></div>
+        <div class="stat"><b id="p-streak"></b><small>kun 🔥</small></div>
+        <div class="stat"><b id="p-lessons"></b><small>dars</small></div>
+        <div class="stat"><b id="p-exam"></b><small>imtihon</small></div>
+      </div>
+    </div>
+    <div id="p-prog-wrap" hidden><div class="section-title"><h3>📊 Mening progressim</h3><span id="p-prog-sum"></span></div><div class="prog-grid" id="p-prog"></div></div>
+    <div id="p-att-wrap" hidden><div class="section-title"><h3>📝 Jonli darslar</h3><span id="p-att-sum"></span></div><div class="card att-card" id="p-att"></div></div>
+    <div class="section-title"><h3>🏅 Nishonlar</h3><span id="p-badge-sum"></span></div>
+    <div class="badges" id="p-badges"></div>
+    <div class="section-title"><h3>🤝 Do'stlar</h3></div>
+    <button class="card install" id="p-invite" style="margin-top:0">
+      <span style="font-size:30px" aria-hidden="true">🎁</span>
+      <span><b>Do'stni taklif qilish</b><small id="p-ref-stat">Do'stingiz birinchi darsini o'tsa, ikkalangizga +100 XP</small></span>
+      <span aria-hidden="true">→</span>
+    </button>
+    <div class="section-title"><h3>⚙️ Sozlamalar</h3></div>
+    <div class="card style-pick">
+      <b>🎨 Ko'rinish</b>
+      <div class="seg" role="group" aria-label="Ko'rinishni tanlang" style="margin:0">
+        <button type="button" data-style-pick="mundil">🟢 Mundil</button>
+        <button type="button" data-style-pick="premium">🌙 Qorong'u</button>
+        <button type="button" data-style-pick="krem">☀️ Yorug'</button>
+      </div>
+    </div>
+    <div class="card style-pick" style="margin-top:8px">
+      <b>🔔 Ovoz effektlari</b>
+      <div class="seg" role="group" aria-label="Ovoz effektlari" style="margin:0">
+        <button type="button" data-sfx="1">🔊 Yoqilgan</button>
+        <button type="button" data-sfx="0">🔇 O'chiq</button>
+      </div>
+    </div>
+    <div class="card style-pick" style="margin-top:8px" id="push-card"></div>
+    <div class="settings">
+      <button class="btn btn-soft btn-block" id="p-rename">✏️ Ismni o'zgartirish</button>
+      <button class="btn btn-danger btn-block" id="p-reset">🗑 Natijalarni boshidan boshlash</button>
+    </div>
+    <div class="settings" style="margin-top:8px">
+      <button class="btn btn-brand btn-block" id="p-teacher" hidden>👨‍🏫 Ustoz paneliga o'tish</button>
+      <button class="btn btn-soft btn-block" id="p-logout">🚪 Chiqish</button>
+    </div>
+    <p class="muted" style="font-size:12.5px;text-align:center;margin-top:18px">Natijalaringiz internetda saqlanadi.<br>Boshqa telefondan ismingiz va PIN bilan kiring.</p>
+  </section>
+</div>
+
+<div class="tabbar">
+  <nav aria-label="Asosiy menyu">
+    <button class="tab" data-tab="home" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Bosh sahifa</button>
+    <button class="tab" data-tab="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h2M14 14h2M8 17h2"/></svg>Bugun</button>
+    <button class="tab" data-tab="lessons"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6c-3-2-6-2-9-1v14c3-1 6-1 9 1 3-2 6-2 9-1V5c-3-1-6-1-9 1Zm0 0v14"/></svg>Darslar</button>
+    <button class="tab" data-tab="top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/></svg>Reyting</button>
+    <button class="tab" data-tab="words"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h11a3 3 0 0 1 3 3v12H7a3 3 0 0 1-3-3zM18 8h2v12M8 9h6M8 13h4"/></svg>Lug'at</button>
+    <button class="tab" data-tab="profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Profil</button>
+  </nav>
+</div>
+
+<!-- FONETIKA: harf darsi (to'liq ekran) -->
+<section class="fon" id="fon" hidden><div class="fon-in" id="fon-in"></div></section>
+
+<section class="quiz" id="quiz" hidden><div class="quiz-in" id="quiz-in"></div></section>
+
+<!-- KIRISH -->
+<section class="auth" id="auth" hidden>
+  <div class="auth-in">
+    <div class="auth-brand"><div class="logo logo-img" aria-hidden="true"><img src="icon-192.png" alt=""></div><div><b>Mundil.uz</b><small>Arab tilini o'yin orqali o'rganing</small></div></div>
+    <div class="seg auth-tabs" role="tablist">
+      <button type="button" id="auth-tab-join" aria-pressed="true">Birinchi marta</button>
+      <button type="button" id="auth-tab-login" aria-pressed="false">Menda hisob bor</button>
+    </div>
+    <p class="auth-err" id="auth-ref" hidden style="background:var(--gold-soft);color:var(--gold)"></p>
+    <form id="auth-form" class="auth-form" novalidate>
+      <label for="auth-code">Guruh kodi <small>(ustozingiz beradi)</small></label>
+      <input class="input" id="auth-code" autocomplete="off" autocapitalize="characters" placeholder="Masalan: DOD_ARABIC" required>
+      <label for="auth-name">Ismingiz</label>
+      <input class="input" id="auth-name" maxlength="30" autocomplete="given-name" placeholder="Ism va familiya" required>
+      <label for="auth-pin">PIN-kod <small id="auth-pin-hint">(4 ta raqam, o'zingiz o'ylab toping va eslab qoling)</small></label>
+      <input class="input pin" id="auth-pin" inputmode="numeric" pattern="\d{4}" maxlength="4" autocomplete="off" placeholder="• • • •" required>
+      <p class="auth-err" id="auth-err" role="alert" hidden></p>
+      <button class="btn btn-brand btn-block" type="submit" id="auth-submit">Boshlash 🚀</button>
+    </form>
+    <button type="button" class="link-btn" id="auth-teacher" style="justify-self:center">👨‍🏫 Men ustozman</button>
+  </div>
+</section>
+
+<!-- USTOZ PANELI -->
+<section class="teacher" id="teacher" hidden>
+  <div class="app" style="padding-bottom:40px">
+    <header class="top">
+      <div class="hello"><div class="logo logo-img" aria-hidden="true"><img src="icon-192.png" alt=""></div><div><small>Ustoz paneli</small><strong id="tc-group">Mundil.uz</strong></div></div>
+      <button class="btn btn-soft" id="tc-refresh" style="padding:10px 12px" aria-label="Yangilash">🔄</button>
+    </header>
+    <div class="card tc-pass" id="tc-pass-card" hidden>
+      <b>🔑 Parol o'rnating</b>
+      <small class="muted">Keyingi safar ilovaga shu parol bilan kirasiz, havola kerak bo'lmaydi.</small>
+      <button class="btn btn-brand btn-block" data-pass>Parol o'rnatish</button>
+    </div>
+    <div class="seg tc-tabs" role="tablist">
+      <button type="button" data-tct="home" aria-pressed="true">📊 Umumiy</button>
+      <button type="button" data-tct="progress" aria-pressed="false">📈 Progress</button>
+      <button type="button" data-tct="students" aria-pressed="false">👥 Talabalar</button>
+      <button type="button" data-tct="attend" aria-pressed="false">📝 Davomat</button>
+      <button type="button" data-tct="journal" aria-pressed="false" hidden>📒 Jurnal</button>
+      <button type="button" data-tct="speak" aria-pressed="false">🎤 Ovozlar <span class="badge-count" id="tc-speak-count" hidden></span></button>
+      <button type="button" data-tct="settings" aria-pressed="false">⚙️</button>
+    </div>
+
+    <div data-tcp="home">
+      <div class="tc-stats" id="tc-stats" style="margin-top:0"></div>
+      <div class="section-title"><h3>📖 Ochiq darslar</h3><span>har bir daraja alohida</span></div>
+      <div class="card tc-controls" id="tc-levels"></div>
+      <div class="card tc-controls" style="margin-top:10px">
+        <div class="tc-row"><span><b>🎓 Sinov imtihoni</b><small class="muted" id="tc-exam-state"></small></span>
+          <button class="btn btn-soft" id="tc-exam"></button></div>
+        <button class="btn btn-brand btn-block" id="tc-report">📈 Haftalik hisobot</button>
+      </div>
+      <details class="card tc-more"><summary>🧩 Guruh qiynalgan mavzular <small class="muted">shu hafta</small></summary><div id="tc-hard"></div></details>
+      <details class="card tc-more"><summary>⚔️ So'nggi duellar <small class="muted">24 soat</small></summary><div id="tc-duels"></div></details>
+    </div>
+
+    <div data-tcp="students" hidden>
+      <p class="muted" style="font-size:12.5px;margin:0 2px 10px">🟢 5+ kun · 🟡 2–4 · 🔴 0–1 (oxirgi 7 kunda). Batafsil uchun ismni bosing.</p>
+      <div class="tc-list" id="tc-list"></div>
+      <details class="card tc-more"><summary>🤝 Takliflar <small class="muted" id="tc-refs-sum"></small></summary><div id="tc-refs"></div></details>
+    </div>
+
+    <div data-tcp="progress" hidden><div id="tc-prog"></div></div>
+
+    <div data-tcp="attend" hidden><div id="tc-att"></div></div>
+
+    <div data-tcp="journal" hidden><div id="tc-jr"></div></div>
+
+    <div data-tcp="speak" hidden>
+      <p class="muted" style="font-size:12.5px;margin:0 2px 10px" id="tc-speak-sum"></p>
+      <div class="tc-list" id="tc-speak"></div>
+    </div>
+
+    <div data-tcp="settings" hidden>
+      <div class="card tc-controls">
+        <div class="tc-row"><span><b>👥 Guruh kodi</b><small class="muted">Talabalar shu kod bilan qo'shiladi</small></span><b style="font-family:var(--f-display)" id="tc-code">DOD_ARABIC</b></div>
+        <button class="btn btn-soft btn-block" data-pass>🔑 Ustoz parolini o'zgartirish</button>
+        <button class="btn btn-soft btn-block" id="tc-as-student">🎓 O'quvchi sifatida ko'rish</button>
+        <button class="btn btn-danger btn-block" id="tc-logout">🚪 Ustoz rejimidan chiqish</button>
+      </div>
+    </div>
+  </div>
+</section>
+<div id="sheet-root"></div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="data.js?v=7067b9615b"></script>
+<script src="avatar.js?v=7067b9615b"></script>
+<script src="app.js?v=7067b9615b"></script>
+</body>
+</html>

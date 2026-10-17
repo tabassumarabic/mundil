@@ -1,0 +1,3073 @@
+/* Mundil.uz (avvalgi nomlari Dod, Tabassum) — arab tili ilovasi.
+   Savollar botdagi quiz.py bilan bir xil tuziladi. Natijalar, reyting, duel va ustoz paneli —
+   Supabase bazasida (faqat xavfsiz funksiyalar orqali, har chaqiruvda token tekshiriladi). */
+(() => {
+  "use strict";
+  const D = window.DOD_DATA;
+  const API = "https://fstmvfroylwyelmaxhzh.supabase.co/rest/v1/rpc/";
+  const API_KEY = "sb_publishable_dNWgUrggq3AEbr4Ifu74Cg_8iq3K1Nm";   // ochiq kalit — ilovada turishi xavfsiz
+  const K_TOKEN = "dod_token", K_TEACHER = "dod_teacher", K_MODE = "dod_mode", K_REF = "dod_ref",K_PENDING = "dod_pending", K_CACHE = "dod_cache";
+
+  const TIMER = 15, FAST = 5, PASS = 80, XP_OK = 10, XP_FAST = 5, XP_MISSION = 20, XP_EXAM = 50, XP_WOTD = 5, DAILY_CAP = 700;
+  const REVIEW_NEEDED = 2, DUEL_QUESTIONS = 10, DUEL_LAST_LESSONS = 3;   // duel: 10 ta, turlari aralash (ustoz, 2026-10-05)
+
+  const RANKS = [[0, "🌱 Yangi boshlovchi"], [100, "📖 Harf ovchisi"], [300, "⭐ So'z ustasi"], [700, "🏅 Mundil bilimdoni"], [1500, "👑 Mundil qiroli"]];
+  const SIMILAR = ["بتثني", "جحخ", "دذ", "رز", "سش", "صض", "طظ", "عغ", "فق", "كلمهـوأ"];
+  const SKILLS = { reading: "📖 O'qish va lug'at", grammar: "✏️ Grammatika", listening: "🎧 Tinglash", writing: "✍️ Yozish" };
+  const EXAM_PLAN = [["reading", 8], ["grammar", 6], ["listening", 6]];
+  const WH = ["مَنْ هَذَا؟", "مَنْ هَذِهِ؟", "مَا هَذَا؟", "مَا هَذِهِ؟"];
+  const DEMO = ["هَذَا", "هَذِهِ"];
+  const SHOWN = {
+    num: ["🔢 <b>{s}</b> raqami arabchada qanday aytiladi?", "🎧 Qaysi raqam aytildi?"],
+    time: ["🕗 Soat <b>{s}</b>. Arabchada qanday aytiladi?", "🎧 Soat nechi dedi?"],
+    color: ["🎨 <b>{s}</b> rang arabchada qanday? (muzakkar)", "🎧 Qaysi rang aytildi?"],
+    day: ["📅 <b>{s}</b> arabchada qanday?", "🎧 Qaysi kun aytildi?"],
+    month: ["🗓 <b>{s}</b> oyi arabchada qanday?", "🎧 Qaysi oy aytildi?"],
+    season: ["🍂 <b>{s}</b> fasli arabchada qanday?", "🎧 Qaysi fasl aytildi?"],
+  };
+  const BADGES = [
+    ["first", "🌱", "Birinchi qadam", "Birinchi kunlik missiya"],
+    ["fire7", "🔥", "Olovli hafta", "7 kun ketma-ket"],
+    ["fire30", "🌋", "Olovli oy", "30 kun ketma-ket"],
+    ["flash", "⚡", "Chaqmoq", "Missiyada 5 ta tez javob"],
+    ["perfect", "💯", "Mukammal", "Darsdan 100%"],
+    ["lessons3", "📚", "Bilimdon", "3 ta dars o'tildi"],
+    ["duel1", "⚔️", "Birinchi g'alaba", "Duelda yuting"],
+    ["ear50", "🎧", "O'tkir quloq", "Tinglashda 50 ta to'g'ri"],
+    ["speak10", "🎙", "Notiq", "10 ta ovozli javob baholandi"],
+    ["fixer20", "🩹", "Xatolar ustasi", "20 ta xato tuzatildi"],
+    ["wotd10", "☀️", "Erta qush", "10 ta kun so'zi"],
+    ["exam", "🎓", "Imtihon sinovi", `Imtihondan ${PASS}%+`],
+    ["xp1000", "⭐", "Ming ball", "Jami 1000 XP"],
+    ["elchi", "🤝", "Elchi", "3 ta do'stni olib keldi"],
+  ];
+  const ERRORS = {
+    BAD_CODE: "Guruh kodi noto'g'ri. Ustozingizdan so'rang.",
+    BAD_NAME: "Ismingizni to'liq yozing (2–30 harf).",
+    BAD_PIN: "PIN 4 ta raqamdan iborat bo'lishi kerak.",
+    NAME_TAKEN: "Bu ism guruhda band. «Menda hisob bor» bo'limidan kiring yoki familiyangizni ham qo'shing.",
+    BAD_LOGIN: "Ism yoki PIN noto'g'ri. PIN'ni unutgan bo'lsangiz, ustozingiz yangilab beradi.",
+    LOCKED: "Ko'p marta xato kiritildi. 10 daqiqadan keyin qayta urinib ko'ring.",
+    AUTH: "Hisobingizga qayta kiring.",
+    NET: "Internet bilan aloqa yo'q. Tekshirib, qayta urinib ko'ring.",
+    SPEAK_LIMIT: "Bugun 3 ta javob yubordingiz. Ertaga davom etamiz! 💪",
+    AUDIO_TOO_BIG: "Yozuv juda uzun. Qisqaroq qilib qayta yozing.",
+    BAD_AUDIO: "Yozuv juda qisqa yoki buzilgan. Qayta yozib ko'ring.",
+    NOT_FOUND: "Topilmadi (ovoz 30 kundan keyin o'chiriladi).",
+    BAD_SCORE: "Bahoni 1 dan 5 gacha tanlang.",
+    BAD_TEACHER_LOGIN: "Guruh kodi yoki ustoz paroli noto'g'ri.",
+    NO_PASSWORD: "Bu guruh uchun ustoz paroli hali o'rnatilmagan. Avval ustoz havolasi orqali kirib, ⚙️ bo'limida parol o'rnating.",
+    BAD_PASSWORD: "Parol kamida 6 ta belgidan iborat bo'lsin.",
+    TEACHER_AUTH: "Ustoz seansi tugagan. Qaytadan kiring.",
+  };
+
+  // ---------- Yordamchilar ----------
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const rnd = n => Math.floor(Math.random() * n);
+  const pick = a => a[rnd(a.length)];
+  const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const isAr = s => /[؀-ۿ]/.test(s);
+  const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch { /* xotira yopiq */ } },
+    del(k) { try { localStorage.removeItem(k); } catch { /* */ } },
+  };
+
+  function toast(msg) {
+    const t = $("#toast"); t.textContent = msg; t.hidden = false;
+    clearTimeout(toast.t); toast.t = setTimeout(() => (t.hidden = true), 3000);
+  }
+
+  // ---------- Server bilan aloqa ----------
+  async function rpc(fn, args) {
+    let res;
+    try {
+      res = await fetch(API + fn, {
+        method: "POST",
+        headers: { apikey: API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify(args || {}),
+      });
+    } catch { throw new Error("NET"); }
+    const text = await res.text();
+    const body = text ? JSON.parse(text) : null;
+    if (!res.ok) throw new Error((body && body.message) || "NET");
+    if (body && body.error) throw new Error(body.error);
+    return body;
+  }
+  const errText = e => ERRORS[e.message] || "Xatolik yuz berdi. Qayta urinib ko'ring.";
+
+  // ---------- Holat ----------
+  // S — talabaning o'quv holati (bazada saqlanadi). ME — server bergan ma'lumot (ism, XP, guruh).
+  const fresh = () => ({ streak: 0, lastMission: null, lessons: {}, days: {}, daily: {}, dstart: null, mistakes: {}, c: {}, badges: [], wotd: {}, examBest: 0 });
+  let S = fresh(), ME = null, TOKEN = store.get(K_TOKEN);
+  const today = () => (ME && ME.today) || new Date().toISOString().slice(0, 10);
+  const addDays = (d, n) => { const x = new Date(d + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+  const yesterday = () => addDays(today(), -1);
+  const bump = (k, by = 1) => (S.c[k] = (S.c[k] || 0) + by);
+  // Olov musobaqasi ustoz «0 dan boshlagan» sanadan (group.olov_since) oldingi kunlarni hisoblamaydi
+  const olovSince = () => (ME && ME.group && ME.group.olov_since) || "";
+  // 🔥 Olov endi KUNLIK DARS bilan yonadi (2026-10-17). S.lastMission — olov yongan oxirgi kun. Yakshanba — dam olish, zanjirni uzmaydi
+  const prevWorkday = d => { let x = addDays(d, -1); if (new Date(x + "T00:00:00Z").getUTCDay() === 0) x = addDays(x, -1); return x; };
+  const streakNow = () => (S.lastMission && S.lastMission >= prevWorkday(today()) && S.lastMission >= olovSince() ? S.streak : 0);
+  const rankOf = xp => RANKS.filter(r => xp >= r[0]).pop()[1];
+
+  // Natija saqlanmay qolsa (internet yo'q), navbatga qo'yiladi va keyin yuboriladi
+  const pending = () => { try { return JSON.parse(store.get(K_PENDING) || "[]"); } catch { return []; } };
+  // Server rad etgan so'rov (kodi KATTA_HARFLAR bilan keladi) qayta yuborilsa ham o'tmaydi — navbatga faqat aloqa xatolari qo'yiladi
+  const rejected = e => /^[A-Z_]+$/.test(e.message) && e.message !== "NET";
+  // Xatolar ro'yxati cheksiz o'smasin (holat serverga har safar to'liq yuboriladi): eng eskilari tushib qoladi
+  const MISTAKES_MAX = 150;
+  function trimMistakes(max = MISTAKES_MAX) { const ks = Object.keys(S.mistakes); ks.slice(0, Math.max(0, ks.length - max)).forEach(k => delete S.mistakes[k]); }
+  const sendResult = it => rpc("save_result", { p_token: TOKEN, p_state: S, p_practice: it.practice, p_bonus: it.bonus, p_kind: it.kind, p_answers: it.answers });
+  async function saveResult(practice, bonus, kind, answers) {
+    const item = { practice, bonus, kind, answers };
+    try {
+      let r;
+      try { r = await sendResult(item); }
+      catch (e) { if (e.message !== "STATE_TOO_BIG") throw e; trimMistakes(40); r = await sendResult(item); }   // holat kattalashib ketgan: ixchamlab, yana bir urinamiz
+      ME.xp = r.xp; ME.practice_today = r.practice_today;
+      store.set(K_CACHE, JSON.stringify({ ME, S }));
+      flushPending();
+      return r;
+    } catch (e) {
+      if (e.message === "AUTH") { logout(true); return { granted: 0, bonus: 0 }; }
+      if (rejected(e)) return { granted: 0, bonus: 0, failed: true };
+      const q = pending(); q.push(item); store.set(K_PENDING, JSON.stringify(q.slice(-20)));
+      store.set(K_CACHE, JSON.stringify({ ME, S }));
+      return { granted: practice, bonus, offline: true };
+    }
+  }
+  async function flushPending() {
+    const q = pending(); if (!q.length) return;
+    store.set(K_PENDING, "[]");
+    for (let i = 0; i < q.length; i++) {
+      try { const r = await sendResult(q[i]); ME.xp = r.xp; }
+      catch (e) {
+        if (rejected(e) && e.message !== "AUTH") continue;   // bu yozuv hech qachon o'tmaydi — navbatni to'sib turmasin
+        store.set(K_PENDING, JSON.stringify([...q.slice(i), ...pending()].slice(-20))); break;
+      }
+    }
+    if (ME) store.set(K_CACHE, JSON.stringify({ ME, S }));
+  }
+
+  // ---------- Ovoz ----------
+  let player = null;
+  function play(text) {
+    if (!D.audio[text] && !D.audio["F|" + text] && FON_AUDIO.has(text)) return fonPlay(text);   // fonetika ovozlari alohida (f_<kod>.mp3)
+    const file = D.audio[text] || D.audio["F|" + text];   // suhbat javoblari faqat ayol ovozida yozilgan
+    if (!file) return;
+    playSeq.id = (playSeq.id || 0) + 1;   // ketma-ket o'qish ketayotgan bo'lsa, to'xtaydi
+    try { if (player) player.pause(); player = new Audio("audio/" + file); player.play().catch(() => toast("🔊 Ovozni yoqish uchun ekranga bir marta bosing")); } catch { /* ovozsiz davom */ }
+  }
+  // 🔔 Ovoz effektlari: brauzerning o'zida yaratiladi (fayl yo'q). Profilda o'chirish mumkin (dod_sfx = "0")
+  let actx = null;
+  const sfxOn = () => store.get("dod_sfx") !== "0";
+  function sfx(kind) {
+    if (!sfxOn()) return;
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === "suspended") actx.resume();
+      const n = actx.currentTime;
+      const T = (f, d, dur, type = "triangle", v = 0.16) => {
+        const o = actx.createOscillator(), g = actx.createGain();
+        o.type = type; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, n + d);
+        g.gain.exponentialRampToValueAtTime(v, n + d + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0001, n + d + dur);
+        o.connect(g).connect(actx.destination); o.start(n + d); o.stop(n + d + dur + 0.05);
+      };
+      ({
+        ok: () => { T(880, 0, 0.12); T(1318.5, 0.09, 0.24); },                                 // to'g'ri: «ding-ding»
+        bad: () => { T(233, 0, 0.16, "square", 0.05); T(196, 0.13, 0.26, "square", 0.05); },  // xato: yumshoq past ovoz
+        tap: () => T(700, 0, 0.05, "sine", 0.06),
+        pop: () => T(1046.5, 0, 0.08, "sine", 0.12),
+        win: () => [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => T(f, i * 0.11, 0.3, "triangle", 0.15)),   // g'alaba
+        done: () => { T(523.25, 0, 0.18, "triangle", 0.12); T(659.25, 0.15, 0.32, "triangle", 0.12); },
+        badge: () => [783.99, 987.77, 1174.66, 1567.98].forEach((f, i) => T(f, 0.35 + i * 0.07, 0.22, "sine", 0.12)),
+      })[kind]?.();
+    } catch { /* ovozsiz davom */ }
+  }
+
+  // Bir nechta gapni ketma-ket o'qish (suhbat, matn). onLine(i) — qaysi gap o'qilyapti, oxirida onLine(-1)
+  function playSeq(texts, onLine) {
+    const id = (playSeq.id = (playSeq.id || 0) + 1);
+    let i = 0;
+    const next = () => {
+      if (id !== playSeq.id) return;
+      if (i >= texts.length) return onLine && onLine(-1);
+      const file = D.audio[texts[i]];
+      onLine && onLine(i); i++;
+      if (!file) return next();
+      try {
+        if (player) player.pause();
+        player = new Audio("audio/" + file);
+        player.onended = () => setTimeout(next, 350);
+        player.play().catch(() => toast("🔊 Ovozni yoqish uchun ekranga bir marta bosing"));
+      } catch { /* ovozsiz */ }
+    };
+    next();
+  }
+
+  // ---------- Darslar ----------
+  // Tartib: Pre-A1 (1–13), keyin A1 bo'limlari (101, 102, ...). Ustoz ochgan darslar soni shu tartib bo'yicha
+  const ORDER = D.lessons.map(l => l.number);
+  const lesson = n => D.lessons.find(l => l.number === n);
+  const nextOf = n => ORDER[ORDER.indexOf(n) + 1];
+  const prevOf = n => ORDER[ORDER.indexOf(n) - 1];
+  const lname = n => n > 100 ? `A1 ${n - 100}-bo'lim` : `${n}-dars`;   // "3-dars" yoki "A1 2-bo'lim"
+  const passed = n => (S.lessons[n] || 0) >= PASS;
+  // Har bir daraja ustoz tomonidan alohida ochiladi: Pre-A1 — open_lessons, A1 — open_a1
+  const levelOf = n => (lesson(n) || {}).level || "Pre-A1";
+  const OPEN_FIELD = { "Pre-A1": "open_lessons", "A1": "open_a1" };
+  const openCount = (code, g = ME && ME.group) => (g ? g[OPEN_FIELD[code]] || 0 : code === "Pre-A1" ? 1 : 0);
+  const teacherOpened = n => (n > 100 ? n - 100 : n) <= openCount(levelOf(n));
+  // Darajaning birinchi darsi oldingi darajani tugatishni talab qilmaydi (ustoz ochgani yetarli)
+  const isOpen = n => teacherOpened(n) && (!prevOf(n) || levelOf(prevOf(n)) !== levelOf(n) || passed(prevOf(n)));
+  const openLessons = () => D.lessons.filter(l => isOpen(l.number));
+  const groupLessons = () => D.lessons.filter(l => teacherOpened(l.number));
+
+  // ---------- Savol tuzish (botdagi quiz.py ning aynan o'zi) ----------
+  function options(correct, pool, k = 4) {
+    const others = shuffle([...new Set(pool)].filter(p => p !== correct)).slice(0, k - 1);
+    const opts = shuffle([...others, correct]);
+    return [opts, opts.indexOf(correct)];
+  }
+  function similarPool(ch, letters, field = "name") {
+    const g = SIMILAR.find(x => x.includes(ch)) || "";
+    let names = letters.filter(l => g.includes(l.char) && l.char !== ch).map(l => l[field]);
+    if (names.length < 3) names = names.concat(shuffle(letters.filter(l => !names.includes(l[field]) && l.char !== ch).map(l => l[field])).slice(0, 3 - names.length));
+    return names;
+  }
+  // Butun alifbo (har harf bir marta): darsda 3 ta harf bo'lsa ham, savolda 4 ta variant chiqishi uchun
+  const ALPHABET = [...new Map(D.lessons.flatMap(l => l.letters || []).map(l => [l.char, l])).values()];
+  const sameKind = (w, words) => words.filter(x => (x.pos || "") === (w.pos || ""));
+  const Q = (maker, skill, topic, text, [opts, correct], extra = {}) => ({ key: `${maker}:${topic}`, skill, topic, text, options: opts, correct, ...extra });
+
+  const M = {
+    ar2uz: d => { const w = pick(d.words); return Q("ar2uz", "reading", w.ar, `<b>${w.ar}</b>\n\nBu so'z nima degani?`, options(w.uz, sameKind(w, d.words).map(x => x.uz)), { hint: `${w.ar}: ${w.uz}`, audio: w.ar }); },
+    uz2ar: d => { const w = pick(d.words); return Q("uz2ar", "reading", w.ar, `<b>«${cap(w.uz)}»</b> arabchada qanday bo'ladi?`, options(w.ar, sameKind(w, d.words).map(x => x.ar))); },
+    letter: d => { const l = pick(d.letters); return Q("letter", "reading", l.char, `<b>${l.char}</b>\n\nBu harfning nomi nima?`, options(l.name, [...similarPool(l.char, ALPHABET), l.name])); },
+    phrase: d => { const p = pick(d.phrases); return Q("phrase", "reading", p.ar, `<b>${p.ar}</b>\n\nBu ibora nima degani?`, options(p.uz, d.phrases.map(x => x.uz))); },
+    shown: d => { const s = pick(d.shown); const same = d.shown.filter(x => x.kind === s.kind); return Q("shown", "reading", s.ar, SHOWN[s.kind][0].replace("{s}", s.shown), options(s.ar, same.map(x => x.ar))); },
+    dialog: d => { const x = pick(d.dialogs); return Q("dialog", "grammar", x.say, `Sizga <b>«${x.say}»</b> deyishdi.\n\nQanday javob berasiz?`, options(x.reply, d.dialogs.map(y => y.reply))); },
+    first: d => { const w = pick(d.words.filter(x => x.letter)); return Q("first", "grammar", w.ar, `<b>«${cap(w.uz)}»</b> arabchada qaysi harf bilan boshlanadi?`, options(w.letter, [...d.letters.map(l => l.char), ...similarPool(w.letter, ALPHABET, "char")]), { hint: `${cap(w.uz)}: ${w.ar}` }); },
+    demo: d => { const x = pick(d.demonstratives); return Q("demo", "grammar", x.word, `Bo'sh joyga nima qo'yiladi?\n\n<b>...... ${x.word}</b>`, [DEMO, x.fem ? 1 : 0], { hint: "هَذَا: muzakkar (erkak jinsi), هَذِهِ: muannas (ayol jinsi, ko'pincha ة bilan tugaydi)" }); },
+    wh: d => { const x = pick(d.wh); return Q("wh", "grammar", x.answer, `Javob: <b>«${x.answer}»</b>\n\nSavol qanday bo'lgan?`, [WH, WH.indexOf(x.question)], { hint: "مَنْ: odam uchun, مَا: narsa va hayvon uchun" }); },
+    fill: d => { const x = pick(d.fills); return Q("fill", "grammar", x.topic || x.a, x.q, options(x.a, [...x.opts, x.a]), x.hint ? { hint: x.hint } : {}); },
+    l_word: d => { const w = pick(d.words); return Q("l_word", "listening", w.ar, "🎧 Eshiting. Qaysi so'z aytildi?", options(w.ar, sameKind(w, d.words).map(x => x.ar)), { audio: w.ar, hint: `${w.ar}: ${w.uz}` }); },
+    l_mean: d => { const w = pick(d.words); return Q("l_mean", "listening", w.ar, "🎧 Eshiting. Bu so'z nima degani?", options(w.uz, sameKind(w, d.words).map(x => x.uz)), { audio: w.ar, hint: `${w.ar}: ${w.uz}` }); },
+    l_letter: d => { const l = pick(d.letters); return Q("l_letter", "listening", l.char, "🎧 Eshiting. Qaysi harf aytildi?", options(l.char, [...similarPool(l.char, ALPHABET, "char"), l.char]), { audio: l.name, hint: `${l.char}: ${l.name}` }); },
+    l_dialog: d => { const x = pick(d.dialogs); return Q("l_dialog", "listening", x.say, "🎧 Suhbatdoshingiz gapini eshiting.\n\nUnga qaysi <b>javob</b> mos keladi?", options(x.reply, d.dialogs.map(y => y.reply)), { audio: x.say, hint: `Aytilgani: ${x.say}` }); },
+    l_shown: d => { const s = pick(d.shown); const same = d.shown.filter(x => x.kind === s.kind); return Q("l_shown", "listening", s.ar, SHOWN[s.kind][1], options(s.shown, same.map(x => x.shown)), { audio: s.ar, hint: `${s.shown}: ${s.ar}` }); },
+
+    // ---- A1 uchun yangi turlar (ko'rsatma arabcha, ostida o'zbekcha izoh) ----
+    // 🙃 Ortiqcha so'z: bir guruhdan 3 ta so'z + boshqa (ma'nosi uzoq) guruhdan 1 ta
+    odd: d => {
+      const g = pick(oddGroups(d));
+      const three = shuffle(g.words).slice(0, 3);
+      const odd = pick(d.words.filter(x => x.pos && x.pos !== g.pos && !near(x.pos, g.pos)));
+      const all = [...three, odd];
+      return Q("odd", "reading", odd.ar, "", options(odd.ar, all.map(x => x.ar)),
+        { type: "odd", ins: INS.odd, gloss: shuffle(all).map(x => [x.ar, x.uz]), hint: `${odd.ar}: ${odd.uz}` });
+    },
+    // 🧩 Gap tuzish: so'zlarni to'g'ri tartibda bosish
+    order: d => {
+      const src = orderSources(d), s = pick(src);
+      const words = s.ar.split(/\s+/);
+      let tiles = shuffle(words);
+      for (let t = 0; t < 5 && tiles.join(" ") === s.ar; t++) tiles = shuffle(words);
+      return { key: `order:${s.ar}`, type: "order", skill: "grammar", topic: s.ar, ins: INS.order, text: s.ctx, answer: words, tiles, hint: s.hint };
+    },
+    // 🔗 Juftini top: 5 ta arabcha ↔ o'zbekcha juftlik
+    match: d => {
+      const seenUz = new Set(), pairs = [];
+      for (const w of shuffle(d.words)) {
+        if (seenUz.has(w.uz)) continue;
+        seenUz.add(w.uz); pairs.push({ ar: w.ar, uz: w.uz });
+        if (pairs.length === 5) break;
+      }
+      return { key: `match:${pairs.map(p => p.ar).sort().join(",")}`, type: "match", skill: "reading", topic: pairs[0].ar, ins: INS.match, text: "", pairs, left: shuffle(pairs.map(p => p.ar)), right: shuffle(pairs.map(p => p.uz)) };
+    },
+  };
+
+  const INS = {
+    odd: ["أَيُّ كَلِمَةٍ مُخْتَلِفَةٌ؟", "Qaysi so'z ortiqcha? (qolgan uchtasiga o'xshamaydi)"],
+    order: ["رَتِّبِ الْكَلِمَاتِ", "So'zlarni to'g'ri tartibda bosing"],
+    match: ["صِلْ كُلَّ كَلِمَةٍ بِمَعْنَاهَا", "Har bir so'zni ma'nosi bilan juftlang"],
+  };
+  // Ma'nosi yaqin guruhlar — ortiqcha so'z shulardan olinmaydi (meva ham ovqat, xona ham joy...)
+  const NEAR = [["food", "drink", "fruit", "meal", "vegetable", "kitchen"], ["place", "room", "city", "country"], ["room", "furniture", "appliance", "kitchen"],
+    ["sport", "hobby"], ["time", "freq", "season", "weather"], ["body", "illness", "medicine"], ["adj", "comparative", "color", "weather"], ["job", "family"],
+    ["adverb", "direction", "place"]];
+  const near = (a, b) => NEAR.some(g => g.includes(a) && g.includes(b));
+  const oddGroups = d => {
+    const by = {};
+    (d.words || []).forEach(w => { if (w.pos) (by[w.pos] = by[w.pos] || []).push(w); });
+    return Object.entries(by).filter(([, ws]) => ws.length >= 3).map(([pos, words]) => ({ pos, words }))
+      .filter(g => d.words.some(x => x.pos && x.pos !== g.pos && !near(x.pos, g.pos)));
+  };
+  // Gap tuzish uchun gaplar: iboralar (o'zbekcha tarjimasi bilan) va suhbat javoblari (savoli bilan); 3–7 so'z
+  const orderSources = d => {
+    const ok = s => { const n = s.split(/\s+/).length; return n >= 3 && n <= 7; };
+    return [
+      ...(d.phrases || []).filter(p => ok(p.ar)).map(p => ({ ar: p.ar, ctx: `<b>«${cap(p.uz)}»</b>` })),
+      ...(d.dialogs || []).filter(x => ok(x.reply)).map(x => ({ ar: x.reply, ctx: `<b>${x.say}</b>\n— Javobni tuzing` })),
+    ];
+  };
+
+  // ---------- A1 kunlik topshiriqlar (Cambridge uslubi) ----------
+  // Har unit bir necha kunga bo'lingan (unit.days). Har kuni: Daily Tasks (4 qism) + alohida Yozish.
+  const DAILY = [["grammar", "✏️", "Grammatika"], ["vocab", "📚", "Lug'at"], ["listening", "🎧", "Tinglash"], ["reading", "📖", "O'qish"]];
+  const PARTS = [...DAILY, ["writing", "✍️", "Yozish"]];
+  const partLabel = p => PARTS.find(x => x[0] === p).slice(1).join(" ");
+  // Kunlik tizim vaqtincha o'chiq (ustoz qarori, 2026-10-01: guruhlar yig'ilganda yoqiladi). O'chiq paytda A1 oddiy dars bo'lib ishlaydi.
+  const DAILY_ON = true;   // «📅 Bugun» yorlig'i (2026-10-17: kunlik dars hamma uchun)
+  const hasParts = () => false;   // eski «unit = 3 kun, sana bo'yicha jadval» tizimi o'chiq; A1 matnlari keyin kunlik darsga qo'shiladi
+  // Kun ma'lumoti: unitning so'zlari va grammatikasi kunlarga teng bo'linadi, matnlar kunning o'zidan
+  const share = (arr, k, of) => { if (!arr) return arr; const n = Math.ceil(arr.length / of); return arr.slice(k * n, (k + 1) * n); };
+  const dayData = (n, k) => { const u = lesson(n), of = u.days.length; return { ...u, ...u.days[k], allWords: u.words, words: share(u.words, k, of), fills: share(u.fills, k, of) }; };
+  // S.days[n][k][part] — eng yaxshi natija (istalgan vaqtda, mashq ham); S.daily[sana] — o'sha kuni bajarilgani (ball shu)
+  const dayScore = (n, k, p) => (((S.days || {})[n] || {})[k] || {})[p];
+  const dayDone = (n, k, list = PARTS) => list.filter(([p]) => (dayScore(n, k, p) || 0) >= PASS).length;
+  const onTime = (date, p) => ((S.daily || {})[date] || { parts: {} }).parts[p];
+  const TF = ["صَحِيحٌ", "خَطَأٌ"];
+  const HARAKAT = /[ً-ْٰـ]/g;
+  Object.assign(INS, {
+    spell: ["رَتِّبِ الْحُرُوفَ", "Harflardan so'z yig'ing"],
+    gap: ["أَكْمِلْ بِكَلِمَةٍ مِنَ النَّصِّ", "Matndagi so'z bilan to'ldiring"],
+    tf: ["صَحِيحٌ أَمْ خَطَأٌ؟", "To'g'rimi yoki noto'g'ri?"],
+    lmc: ["اِسْتَمِعْ ثُمَّ أَجِبْ", "Tinglang va javob bering"],
+    dict: ["اُكْتُبْ مَا تَسْمَعُ", "Eshitganingizni arabcha yozing"],
+    trans: ["اُكْتُبْ بِالْعَرَبِيَّةِ", "Arabchada yozing"],
+  });
+  const spellable = d => d.words.filter(w => {
+    const n = Array.from(w.ar.replace(HARAKAT, "")).length;
+    return !/\s/.test(w.ar) && n >= 3 && n <= 7;
+  });
+  const spellQ = w => {
+    const letters = Array.from(w.ar.replace(HARAKAT, ""));
+    let tiles = shuffle(letters);
+    for (let t = 0; t < 5 && tiles.join("") === letters.join(""); t++) tiles = shuffle(letters);
+    return { key: `spell:${w.ar}`, type: "spell", skill: "reading", topic: w.ar, ins: INS.spell, text: `<b>«${cap(w.uz)}»</b>`, audio: w.ar, answer: letters, tiles, joiner: "", hint: `${w.ar}: ${w.uz}` };
+  };
+  // Bir xil savol takrorlanmasin: maker'ni bir necha marta chaqirib, yangilarini olamiz
+  const several = (fn, k, seen) => { const out = []; for (let t = 0; out.length < k && t < k * 20; t++) { const q = fn(); if (!seen.has(q.key)) { seen.add(q.key); out.push(q); } } return out; };
+  const PART_BUILD = {
+    vocab: d => {
+      const seen = new Set();
+      return [...shuffle(spellable(d)).slice(0, 4).map(spellQ), ...several(() => M.match(d), 2, seen),
+        ...(w => oddGroups(w).length ? several(() => M.odd(w), 2, seen) : [])({ ...d, words: d.allWords || d.words }), ...several(() => M.uz2ar(d), 2, seen)];
+    },
+    grammar: d => {
+      const seen = new Set();
+      return [...(d.fills || []).length ? several(() => M.fill(d), 4, seen) : [], ...orderSources(d).length ? several(() => M.order(d), 3, seen) : [],
+        ...(d.dialogs || []).length ? several(() => M.dialog(d), 2, seen) : []];
+    },
+    reading: d => {
+      const r = d.reading, passage = { title: r.title, text: r.text };
+      return [
+        ...r.gaps.map(g => ({ ...Q("gap", "reading", g.q, `<b>${g.q}</b>`, options(g.a, [...g.opts, g.a])), ins: INS.gap, passage, hint: g.uz })),
+        ...r.tf.map(t => ({ ...Q("tf", "reading", t.s, `<b>${t.s}</b>`, [TF, t.ok ? 0 : 1]), ins: INS.tf, passage, hint: t.uz })),
+      ];
+    },
+    listening: d => {
+      const l = d.listening, dialog = l.lines.map(x => (x.who === "f" ? "F|" : "") + x.ar);
+      return [
+        ...l.tf.map(t => ({ ...Q("ltf", "listening", t.s, `<b>${t.s}</b>`, [TF, t.ok ? 0 : 1]), ins: INS.tf, dialog, hint: t.uz })),
+        ...(l.mc || []).map(m => ({ ...Q("lmc", "listening", m.q, `<b>${m.q}</b>`, options(m.a, [...m.opts, m.a])), ins: INS.lmc, dialog, hint: m.uz })),
+      ];
+    },
+    writing: d => {
+      const w = d.writing;
+      return [
+        ...shuffle(w.dictation).slice(0, 3).map(a => ({ key: `dict:${a}`, type: "write", skill: "writing", topic: a, ins: INS.dict, text: "", audio: a, answer: a })),
+        ...shuffle(w.translate).slice(0, 3).map(t => ({ key: `trans:${t.ar}`, type: "write", skill: "writing", topic: t.ar, ins: INS.trans, text: `<b>«${t.uz}»</b>`, answer: t.ar })),
+      ];
+    },
+  };
+
+  function makers(d, skills, interactive = false) {
+    const m = [], w = d.words || [], a1 = d.level === "A1";
+    if (skills.includes("reading")) {
+      if (w.length) m.push("ar2uz", "ar2uz", "uz2ar", "uz2ar");
+      if (d.letters) m.push("letter", "letter");
+      if (d.phrases) m.push("phrase");
+      if (d.shown) m.push("shown", "shown");
+      if (a1 && oddGroups(d).length) m.push("odd", "odd");
+      if (a1 && interactive && w.length >= 8) m.push("match", "match");
+    }
+    if (skills.includes("grammar")) {
+      if (d.fills) m.push("fill", "fill", "fill");
+      if (w.some(x => x.letter) && (d.letters || []).length <= 6) m.push("first", "first");
+      if (d.demonstratives) m.push("demo", "demo");
+      if (d.wh) m.push("wh", "wh");
+      if (d.dialogs) m.push("dialog");
+      if (a1 && interactive && orderSources(d).length) m.push("order", "order", "order");
+    }
+    if (skills.includes("listening")) {
+      if (w.length) m.push("l_word", "l_word", "l_mean", "l_mean");
+      if (d.letters) m.push("l_letter");
+      if (d.dialogs) m.push("l_dialog");
+      if (d.shown) m.push("l_shown", "l_shown");
+    }
+    return m;
+  }
+
+  // interactive: gap tuzish va juftini top — faqat vaqtsiz dars testida (missiya, duel, imtihonda emas)
+  function build(lessons, count, skills = ["reading", "grammar"], interactive = false) {
+    lessons = lessons.filter(l => makers(l, skills).length);
+    const out = [], seen = new Set();
+    for (let t = 0; lessons.length && out.length < count && t < count * 30; t++) {
+      const d = pick(lessons);
+      const q = M[pick(makers(d, skills, interactive))](d);
+      if (seen.has(q.key)) continue;
+      seen.add(q.key); out.push(q);
+    }
+    return out;
+  }
+  // Duel uchun: savol turlari aralash — eng kam ishlatilgan tur tanlanadi, bir xil tur ketma-ket kelmaydi
+  function buildVaried(lessons, count, skills = ["reading", "grammar", "listening"]) {
+    lessons = lessons.filter(l => makers(l, skills).length);
+    const out = [], seen = new Set(), used = {};
+    let last = null;
+    for (let t = 0; lessons.length && out.length < count && t < count * 40; t++) {
+      const d = pick(lessons), ms = [...new Set(makers(d, skills))];
+      const low = Math.min(...ms.map(m => used[m] || 0));
+      const cand = ms.filter(m => (used[m] || 0) === low && m !== last);
+      const mk = pick(cand.length ? cand : ms.filter(m => m !== last).length ? ms.filter(m => m !== last) : ms);
+      const q = M[mk](d);
+      if (seen.has(q.key)) continue;
+      seen.add(q.key); out.push(q); used[mk] = (used[mk] || 0) + 1; last = mk;
+    }
+    return shuffle(out);
+  }
+  const buildExam = lessons => EXAM_PLAN.flatMap(([sk, n]) => build(lessons, n, [sk]));
+  function reshuffle(q) {
+    if (q.type === "order" || q.type === "spell") return { ...q, tiles: shuffle(q.answer) };
+    if (q.type === "match") return { ...q, left: shuffle(q.left), right: shuffle(q.right) };
+    if (q.type === "write") return q;
+    const right = q.options[q.correct];
+    const opts = [WH, DEMO, TF].some(f => q.options.join() === f.join()) ? q.options.slice() : shuffle(q.options);
+    return { ...q, options: opts, correct: opts.indexOf(right) };
+  }
+
+  // Savol matni: arabcha qatorlar katta harf bilan.
+  // Duel savollari boshqa o'quvchining telefonidan keladi, shuning uchun matndagi <b> dan boshqa hamma narsa oddiy yozuvga aylantiriladi
+  const safeText = s => esc(s).replace(/&lt;(\/?)b&gt;/g, "<$1b>");
+  function promptHtml(text) {
+    return safeText(text).split("\n").filter(l => l.trim()).map(line => {
+      const plain = line.replace(/<[^>]+>/g, "");
+      const ar = (plain.match(/[؀-ۿ]/g) || []).length, lat = (plain.match(/[A-Za-z]/g) || []).length;
+      // Aralash qator (o'zbekcha gap ichida arabcha ibora): o'zbekcha chapdan o'ngga, arabcha qismi alohida o'ngdan chapga
+      if (ar && lat >= 3) return `<div class="p-line mixed">${line.replace(/[؀-ۿ][؀-ۿ\s]*[؀-ۿ]|[؀-ۿ]/g, m => `&lrm;<bdi class="ar ar-inline">${m}</bdi>&lrm;`)}</div>`;
+      if (ar > lat) return `<div class="ar ar-line ${plain.length < 14 ? "huge" : ""}">${line}</div>`;
+      return `<div class="p-line">${line}</div>`;
+    }).join("");
+  }
+
+  // ---------- Test ----------
+  let run = null;
+  const RING = 2 * Math.PI * 19;
+  const CFG = {
+    mission: { title: "Kunlik missiya", timed: true },
+    fonmission: { title: "🌙 Fonetika missiyasi", timed: true },
+    lesson: { title: "Dars testi", timed: false },
+    listen: { title: "Tinglash", timed: false },
+    review: { title: "Xatolarim", timed: false },
+    daily: { title: "Kunlik topshiriq", timed: false },
+    cards: { title: "🃏 Kartalar mashqi", timed: false },
+    exam: { title: "CEFR sinov imtihoni", timed: false },
+    duel: { title: "⚔️ Duel", timed: true },
+  };
+
+  function startRun(kind, qs, extra = {}) {
+    if (!qs.length) return toast("Savollar topilmadi");
+    run = { kind, qs, i: 0, right: 0, fast: 0, fixed: 0, practice: 0, answers: [], bySkill: {}, timeUsed: 0, ...CFG[kind], ...extra };
+    $("#quiz").hidden = false;
+    document.body.style.overflow = "hidden";
+    syncBack();
+    showQ();
+  }
+
+  function closeRun() {
+    if (run) clearInterval(run.timer);
+    if (player) player.pause();
+    run = null; $("#quiz").hidden = true; document.body.style.overflow = "";
+    render();
+    refreshMe();
+    syncBack();
+  }
+
+  // 🎧 Tinglash qismi: avval suhbat to'liq eshittiriladi, keyin savollar
+  function showIntro() {
+    const q = run.qs[0];
+    $("#quiz-in").innerHTML = `
+      <div class="quiz-top"><button class="x" data-quit aria-label="Chiqish">✕</button><div class="progress"><i style="width:0"></i></div></div>
+      <div class="q-meta">${esc(run.title)}</div>
+      <div class="q-card intro"><div class="q-ins"><div class="ar">اِسْتَمِعْ إِلَى الْحِوَارِ</div><small>Avval suhbatni diqqat bilan tinglang, keyin savollar beriladi</small></div>
+        <button class="listen big-listen" id="in-play" aria-label="Tinglash">▶</button>
+        <div class="muted" id="in-st">${q.dialog.length} ta gap</div></div>
+      <button class="btn btn-brand btn-block" id="in-go" disabled>Savollarga o'tish →</button>`;
+    $("[data-quit]").onclick = closeRun;
+    const go = () => playSeq(q.dialog, i => {
+      if (!$("#in-st")) return;
+      $("#in-st").textContent = i < 0 ? "✅ Tinglab bo'ldingiz. Kerak bo'lsa yana tinglang" : `🔊 ${i + 1}/${q.dialog.length}-gap…`;
+      $("#in-play").textContent = i < 0 ? "↻" : "🔊";
+      if (i < 0) $("#in-go").disabled = false;
+    });
+    $("#in-play").onclick = go;
+    $("#in-go").onclick = () => { run.intro = false; playSeq.id++; if (player) player.pause(); showQ(); };
+    setTimeout(() => { const b = $("#in-go"); if (b) b.disabled = false; }, 20000);   // ovoz chiqmasa ham qotib qolmasin
+    go();
+  }
+
+  function showQ() {
+    if (run.intro) return showIntro();
+    const q = run.qs[run.i];
+    const prev = run.qs[run.i - 1];
+    const banner = run.kind === "exam" && (!prev || prev.skill !== q.skill)
+      ? `<div class="section-banner">${EXAM_PLAN.findIndex(p => p[0] === q.skill) + 1}-bo'lim: ${SKILLS[q.skill]}</div>` : "";
+    const listenBtn = q.audio ? `<button class="listen ${q.skill === "listening" ? "big-listen" : ""}" data-say aria-label="Tinglash">🔊</button>` : "";
+    $("#quiz-in").innerHTML = `
+      <div class="quiz-top">
+        <button class="x" data-quit aria-label="Chiqish">✕</button>
+        <div class="progress"><i style="width:${(run.i / run.qs.length) * 100}%"></i></div>
+        ${run.timed ? `<div class="timer" id="timer"><svg width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="22" r="19" stroke="var(--surface-2)" stroke-width="4" fill="none"/><circle id="ring" cx="22" cy="22" r="19" stroke="var(--brand)" stroke-width="4" fill="none" stroke-linecap="round" stroke-dasharray="${RING}" stroke-dashoffset="0"/></svg><span id="tsec">${TIMER}</span></div>` : ""}
+      </div>
+      <div class="q-meta">${esc(run.title)} · ${run.i + 1}/${run.qs.length}</div>
+      ${banner}
+      ${q.passage ? `<details class="passage" ${store.get("dod_passage") === "0" ? "" : "open"}><summary>📖 Matn: <span class="ar">${esc(q.passage.title)}</span></summary>
+        <div class="ar passage-text">${q.passage.text.split("\n").map(p => `<p>${esc(p)}</p>`).join("")}</div>
+        <button class="btn btn-soft" data-passage>🔊 Matnni tinglash</button></details>` : ""}
+      ${q.dialog ? `<div class="dlg-box"><button class="listen big-listen" data-dialog aria-label="Suhbatni tinglash">▶</button>
+        <div><b>🎧 Suhbatni tinglang</b><small id="dlg-st">${q.dialog.length} ta gap · istalgancha qayta tinglash mumkin</small></div></div>` : ""}
+      <div class="q-card">${q.ins ? `<div class="q-ins"><div class="ar">${esc(q.ins[0])}</div><small>${esc(q.ins[1])}</small></div>` : ""}${q.skill === "listening" && !q.dialog ? listenBtn : ""}${promptHtml(q.text)}${q.skill !== "listening" ? listenBtn : ""}</div>
+      ${q.type === "order" || q.type === "spell" ? `${q.type === "spell" ? `<div class="spell-prev ar" id="sprev"></div>` : ""}<div class="slots ar ${q.type}" id="slots"></div><div class="bank ar" id="bank">${q.tiles.map((t, k) => `<button class="wt" data-t="${k}">${esc(t)}</button>`).join("")}</div>
+        <button class="btn btn-brand btn-block" id="check" disabled>Tekshirish</button>`
+      : q.type === "write" ? writeHtml()
+      : q.type === "match" ? `<div class="match"><div class="mcol">${q.left.map(t => `<button class="mt ar" data-side="ar" data-v="${esc(t)}">${esc(t)}</button>`).join("")}</div>
+        <div class="mcol">${q.right.map(t => `<button class="mt" data-side="uz" data-v="${esc(t)}">${esc(t)}</button>`).join("")}</div></div>
+        <div class="m-stat" id="mstat">⏱ 0 s · ❌ 0</div>`
+      : `<div class="opts">${q.options.map((o, k) => `<button class="opt" data-k="${k}"><span class="k">${"ABCD"[k]}</span><span class="v ${isAr(o) ? "ar" : ""}">${esc(o)}</span></button>`).join("")}</div>`}
+      <div id="fb"></div>`;
+    $("[data-quit]").onclick = () => (run.kind === "duel" ? toast("⚔️ Duelni oxirigacha o'ynang") : run.i > 0 && run.kind !== "review" ? confirmExit() : closeRun());
+    const sb = $("[data-say]"); if (sb) sb.onclick = () => play(q.audio);
+    $$(".opt").forEach(b => (b.onclick = () => answer(+b.dataset.k)));
+    if (q.type === "order" || q.type === "spell") bindOrder(q);
+    if (q.type === "match") bindMatch(q);
+    if (q.type === "write") bindWrite(q);
+    const pa = $(".passage");
+    if (pa) {
+      pa.ontoggle = () => store.set("dod_passage", pa.open ? "1" : "0");
+      $("[data-passage]").onclick = () => playSeq(q.passage.text.split("\n"));
+    }
+    if (q.dialog) {
+      const st = $("#dlg-st"), btn = $("[data-dialog]");
+      const go = () => playSeq(q.dialog, i => {
+        if (!$("#dlg-st")) return;
+        st.textContent = i < 0 ? "Yana tinglash uchun ▶ ni bosing" : `${i + 1}/${q.dialog.length}-gap…`;
+        btn.textContent = i < 0 ? "▶" : "🔊";
+      });
+      btn.onclick = go;
+      if ((!prev || !prev.dialog) && !run.hadIntro) go();   // tinglash ekrani bo'lmagan bo'lsa, birinchi savolda o'zi boshlanadi
+    }
+    if (q.skill === "listening") play(q.audio);
+    run.t0 = Date.now();
+    if (run.timed) {
+      clearInterval(run.timer);
+      run.timer = setInterval(() => {
+        const left = Math.max(0, TIMER - (Date.now() - run.t0) / 1000);
+        const ring = $("#ring"); if (!ring) return;
+        ring.setAttribute("stroke-dashoffset", String(RING * (1 - left / TIMER)));
+        ring.setAttribute("stroke", left <= 5 ? "var(--bad)" : "var(--brand)");
+        $("#tsec").textContent = Math.ceil(left);
+        $("#timer").classList.toggle("low", left <= 5);
+        if (left <= 0) answer(-1);
+      }, 100);
+    }
+  }
+
+  function confirmExit() {
+    sheet(`<h3>Testdan chiqasizmi?</h3><p>Bu testdagi natija saqlanmaydi.</p>
+      <button class="btn btn-danger btn-block" id="exit-yes">Ha, chiqaman</button>
+      <button class="btn btn-soft btn-block" data-close>Davom etaman</button>`);
+    $("#exit-yes").onclick = () => { closeSheet(); closeRun(); };
+  }
+
+  // 🧩 Gap tuzish / ✍️ harflardan so'z: pastdagi bo'lakni bossa — yuqoriga o'tadi, yuqoridagini bossa — qaytadi
+  function bindOrder(q) {
+    const placed = [], joiner = q.joiner ?? " ";
+    const draw = () => {
+      $("#slots").innerHTML = placed.length ? placed.map((k, i) => `<button class="wt" data-p="${i}">${esc(q.tiles[k])}</button>`).join("") : `<span class="slots-ph">…</span>`;
+      if ($("#sprev")) $("#sprev").textContent = placed.map(k => q.tiles[k]).join("") || " ";
+      $$("#bank .wt").forEach(b => (b.classList.toggle("used", placed.includes(+b.dataset.t))));
+      $("#check").disabled = placed.length !== q.tiles.length;
+      $$("#slots .wt").forEach(b => (b.onclick = () => { if (run.locked === run.i) return; placed.splice(+b.dataset.p, 1); draw(); }));
+    };
+    $$("#bank .wt").forEach(b => (b.onclick = () => {
+      const k = +b.dataset.t;
+      if (run.locked === run.i || placed.includes(k)) return;
+      placed.push(k); if (q.type === "order" && D.audio[q.tiles[k]]) play(q.tiles[k]); else sfx("tap"); draw();
+    }));
+    $("#check").onclick = () => {
+      const ok = placed.map(k => q.tiles[k]).join(joiner) === q.answer.join(joiner);
+      $("#check").hidden = true;
+      $("#slots").classList.add(ok ? "good" : "bad");
+      $$(".wt").forEach(b => (b.disabled = true));
+      play(q.type === "spell" ? q.audio : q.answer.join(" "));
+      settle(ok, false, q.type === "spell" ? q.audio : q.answer.join(" "));
+    };
+    draw();
+  }
+
+  // ✍️ Yozish: ilova ichidagi arabcha klaviatura (ko'pchilik telefonida arabcha klaviatura yo'q) yoki telefonning o'zinikidan
+  const KB_ROWS = ["ضصثقفغعهخحج", "شسيبلاتنمكط", "ذئءؤرىةوزظد", "أإآ"];
+  const kbMode = () => store.get("dod_kb") || "app";
+  const writeHtml = () => `
+    <input class="input ar w-in" id="win" dir="rtl" lang="ar" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="…" ${kbMode() === "app" ? 'inputmode="none"' : ""}>
+    ${kbMode() === "app" ? `<div class="akb">${KB_ROWS.map(r => `<div class="akb-row">${Array.from(r).map(c => `<button class="akb-k" data-c="${c}">${c}</button>`).join("")}${r === KB_ROWS[3] ? `<button class="akb-k wide" data-c=" ">bo'sh joy</button><button class="akb-k" data-bs aria-label="O'chirish">⌫</button>` : ""}</div>`).join("")}</div>` : ""}
+    <button class="link-btn" id="kb-sw">${kbMode() === "app" ? "📱 Telefon klaviaturasida yozaman" : "⌨️ Ilovadagi arabcha klaviatura"}</button>
+    <button class="btn btn-brand btn-block" id="check">Tekshirish</button>`;
+  // Taqqoslash: harakatlar va tinish belgilari hisobga olinmaydi; "loose" — hamza/ة/ى farqlarini ham kechiradi
+  const strict = s => s.replace(HARAKAT, "").replace(/[؟?!.,،:]/g, "").replace(/\s+/g, " ").trim();
+  const loose = s => strict(s).replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي");
+  function bindWrite(q) {
+    const inp = $("#win");
+    if (!q.text) setTimeout(() => play(q.audio), 300);   // diktant: so'z o'zi eshittiriladi
+    $$(".akb-k").forEach(b => (b.onclick = () => {
+      if (run.locked === run.i) return;
+      inp.value = b.hasAttribute("data-bs") ? Array.from(inp.value).slice(0, -1).join("") : inp.value + b.dataset.c;
+    }));
+    $("#kb-sw").onclick = () => { store.set("dod_kb", kbMode() === "app" ? "phone" : "app"); const v = inp.value; showQ(); $("#win").value = v; if (kbMode() === "phone") $("#win").focus(); };
+    const check = () => {
+      if (run.locked === run.i) return;
+      const v = inp.value;
+      if (!strict(v)) return toast("Avval javobni yozing ✍️");
+      const exact = strict(v) === strict(q.answer), ok = exact || loose(v) === loose(q.answer);
+      inp.readOnly = true; inp.classList.add(ok ? "good" : "bad");
+      $("#check").hidden = true; $("#kb-sw").hidden = true; if ($(".akb")) $(".akb").hidden = true;
+      settle(ok, false, q.answer, ok && !exact ? { note: `Deyarli a'lo! To'g'ri yozilishi: ${q.answer} (hamza, ة yoki ى ga e'tibor bering)` } : {});
+    };
+    $("#check").onclick = check;
+    inp.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); if (run.locked === run.i) $("#next")?.click(); else check(); } };
+  }
+
+  // 🔗 Juftini top: chapdan va o'ngdan bittadan tanlanadi; 1 tagacha xato — to'g'ri hisoblanadi
+  const MATCH_MAX_ERR = 1, MATCH_FAST = 25;
+  function bindMatch(q) {
+    let sel = null, errs = 0, done = 0;
+    const tick = () => { const st = $("#mstat"); if (st) st.textContent = `⏱ ${Math.floor((Date.now() - run.t0) / 1000)} s · ❌ ${errs}`; };
+    clearInterval(run.timer); run.timer = setInterval(tick, 500);
+    $$(".mt").forEach(b => (b.onclick = () => {
+      if (run.locked === run.i || b.disabled) return;
+      if (b.dataset.side === "ar") play(b.dataset.v);
+      if (!sel || sel.dataset.side === b.dataset.side) {
+        if (sel) sel.classList.remove("sel");
+        sel = b; b.classList.add("sel"); return;
+      }
+      const [a, u] = sel.dataset.side === "ar" ? [sel, b] : [b, sel];
+      sel.classList.remove("sel"); sel = null;
+      if (q.pairs.some(p => p.ar === a.dataset.v && p.uz === u.dataset.v)) {
+        [a, u].forEach(x => { x.classList.add("good"); x.disabled = true; }); sfx("pop");
+        if (++done === q.pairs.length) {
+          clearInterval(run.timer); tick();
+          const secs = (Date.now() - run.t0) / 1000;
+          const ok = errs <= MATCH_MAX_ERR;
+          settle(ok, false, "", { fast: ok && secs <= MATCH_FAST, note: `⏱ ${Math.round(secs)} soniya · ${errs ? `❌ ${errs} ta xato` : "xatosiz!"}` });
+        }
+      } else {
+        errs++; tick(); sfx("bad");
+        [a, u].forEach(x => { x.classList.add("bad"); setTimeout(() => x.classList.remove("bad"), 600); });
+      }
+    }));
+  }
+
+  function answer(k) {
+    if (!run || run.locked === run.i) return;
+    const q = run.qs[run.i];
+    $$(".opt").forEach(b => {
+      const i = +b.dataset.k; b.disabled = true;
+      if (i === q.correct) { b.classList.add("good"); b.querySelector(".k").textContent = "✓"; }
+      else if (i === k) { b.classList.add("bad"); b.querySelector(".k").textContent = "✕"; }
+    });
+    settle(k === q.correct, k === -1, q.options[q.correct]);
+  }
+
+  // Javob natijasi: XP, xatolar ro'yxati va pastdagi izoh (barcha savol turlari uchun umumiy)
+  function settle(ok, timeout, right, extra = {}) {
+    if (!run || run.locked === run.i) return;
+    run.locked = run.i;
+    sfx(ok ? "ok" : "bad");
+    clearInterval(run.timer);
+    const q = run.qs[run.i];
+    // kartalar hisobi xato bersa ham, test to'xtab qolmasin
+    if (ok) { try { if (q.type === "match") q.pairs.forEach(p => cardHit(p.ar)); else cardHit(q.topic); } catch { /* */ } }
+    const secs = Math.min(TIMER, (Date.now() - run.t0) / 1000);
+    run.timeUsed += secs;
+    let gain = 0;
+    if (ok) { run.right++; gain = XP_OK; if ((run.timed && secs <= FAST) || extra.fast) { gain += XP_FAST; run.fast++; } }
+    if (run.noXp) gain = 0;   // Practice box: o'tib ketgan kun mashqi — ballsiz
+    if (run.kind !== "duel") run.practice += gain;   // duelda XP faqat natijaga qarab beriladi
+    run.answers.push({ s: q.skill, t: q.topic, c: ok });
+    const sk = run.bySkill[q.skill] || (run.bySkill[q.skill] = [0, 0]);
+    sk[0] += ok ? 1 : 0; sk[1]++;
+
+    // Xatolar ro'yxati, xuddi botdagidek
+    if (run.kind === "review") {
+      const m = S.mistakes[q.key];
+      if (m) {
+        if (ok) { m.streak++; if (m.streak >= REVIEW_NEEDED) { delete S.mistakes[q.key]; run.fixed++; bump("fixed"); } }
+        else m.streak = 0;
+      }
+    } else if (!ok) {
+      delete S.mistakes[q.key];   // qayta xato qilingan savol ro'yxat oxiriga (eng yangilar qatoriga) o'tadi
+      S.mistakes[q.key] = { q: { ...q }, streak: 0 };
+      trimMistakes();
+    }
+    if (ok && q.skill === "listening") bump("listen_ok");
+
+    const shown = run.kind === "duel" || run.noXp ? "" : ` +${gain} XP`;
+    const title = ok ? (gain > XP_OK ? `⚡ Chaqmoqdek tez!${shown}` : `✅ To'g'ri!${shown}`) : (timeout ? "⏰ Vaqt tugadi" : "❌ Noto'g'ri");
+    const why = q.type === "match" ? `Juftliklarni topdingiz, lekin xato ${MATCH_MAX_ERR} tadan oshdi. Keyingi safar shoshilmang 🙂` : "";
+    const gloss = q.gloss ? `<div class="gloss">${q.gloss.map(([a, u]) => `<span${a === right ? ' class="odd"' : ""}><b class="ar">${esc(a)}</b> ${esc(u)}</span>`).join("")}</div>` : "";
+    const body = (extra.note ? `<p>${esc(extra.note)}</p>` : "") + (ok ? gloss
+      : `<p>${why || `To'g'ri javob: <b class="${isAr(right) ? "ar" : ""}">${esc(right)}</b>`}${q.hint && !gloss ? `<br>💡 <span>${esc(q.hint)}</span>` : ""}</p>${gloss}`);
+    const last = run.i + 1 >= run.qs.length;
+    $("#fb").innerHTML = `<div class="feedback ${ok ? "good" : "bad"}"><b>${title}</b>${body}</div>
+      <button class="btn btn-brand btn-block" id="next" style="margin-top:12px">${last ? "Natijani ko'rish" : "Davom etish →"}</button>`;
+    $("#next").onclick = () => { run.i++; last ? finish() : showQ(); };
+    $("#next").focus({ preventScroll: true });
+    setTimeout(() => $("#fb")?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
+  }
+
+  async function finish() {
+    const r = run, n = r.qs.length, pct = Math.round(r.right * 100 / n);
+    const pills = [], lines = [];
+    let headline = pct === 100 ? "Mukammal! 💯" : pct >= PASS ? "Zo'r natija!" : "Yaxshi urinish!";
+    let actions = `<button class="btn btn-soft btn-block" data-home>Bosh sahifa</button>`;
+    let bonus = 0, flash = false, kdKind = null;
+    $("#quiz-in").innerHTML = `<div class="result"><div class="q-meta">${esc(r.title)}</div><div class="score">${r.right}/${n}</div><p class="muted">Natija saqlanmoqda…</p></div>`;
+
+    if (r.kind === "duel") return finishDuel(r);
+
+    if (r.kind === "mission") {
+      if (r.fast) pills.push(`<span class="pill gold">⚡ ${r.fast} ta tez javob</span>`);
+      if (S.missionDay !== today()) {
+        S.missionDay = today(); bonus += XP_MISSION;
+        pills.push(`<span class="pill gold">🎁 +${XP_MISSION} bonus</span>`, chestPill(giveChest("silver")));
+      } else pills.push(`<span class="pill soft">Bugungi missiya avval bajarilgan, bu mashq</span>`);
+      if (S.lastMission !== today()) pills.push(`<span class="pill soft">🔥 Olov kunlik darsni bajarsangiz yonadi</span>`);
+      flash = r.fast >= 5;
+      actions = `<button class="btn btn-brand btn-block" data-again>➕ Yana 5 ta savol</button>` + actions;
+    } else if (r.kind === "fonmission") {
+      if (r.fast) pills.push(`<span class="pill gold">⚡ ${r.fast} ta tez javob</span>`);
+      if (S.fonMission !== today()) { S.fonMission = today(); bonus += XP_MISSION; pills.push(`<span class="pill gold">🎁 +${XP_MISSION} bonus</span>`); }
+      else pills.push(`<span class="pill soft">Bugungi fonetika missiyasi avval bajarilgan, bu mashq</span>`);
+      actions = `<button class="btn btn-brand btn-block" data-again>➕ Yana 12 ta savol</button>` + actions;
+    } else if (r.kind === "daily" && r.kd) {
+      // 📅 Kunlik dars: 4 qism; hammasi 80%+ bo'lsa — olov yonadi, +20 bonus, darsning keyingi kuni ochiladi
+      const t = S.daily[r.date], p = r.part, wasDone = !!t.bonus;
+      t.parts[p] = Math.max(t.parts[p] || 0, pct);
+      const left = KD.filter(([q]) => (t.parts[q] || 0) < PASS);
+      if (!wasDone && !left.length) {
+        t.bonus = true; bonus += XP_MISSION; kdKind = "daily_ok";
+        S.dprog = S.dprog || {}; S.dprog[t.n] = kdProg(t.n) + 1;
+        if (S.dprog[t.n] >= KD_DAYS && !passed(t.n)) S.lessons[t.n] = Math.max(S.lessons[t.n] || 0, PASS);   // 3 kun tugadi — dars o'tildi
+        if (S.lastMission !== today()) { S.streak = S.lastMission === prevWorkday(today()) && S.lastMission >= olovSince() ? S.streak + 1 : 1; S.lastMission = today(); }
+        headline = "🎉 Bugungi dars bajarildi!";
+        pills.push(`<span class="pill gold">🔥 Olov yondi: ${S.streak} kun</span>`, `<span class="pill gold">🎁 +${XP_MISSION} bonus</span>`);
+        if (!pushOn() && pushSupported() && store.get("tb_push") !== "0") actions += `<button class="btn btn-soft btn-block" data-push>🔔 Olovim o'chmasin — eslatmani yoqish</button>`;
+      } else if (pct >= PASS) {
+        headline = left.length ? `✅ ${KD.find(x => x[0] === p)[2]} bajarildi! Yana ${left.length} ta qism qoldi` : "Bugungi dars avval bajarilgan — bu mashq 💪";
+        if (left.length) actions = `<button class="btn btn-brand btn-block" data-kd="${left[0][0]}">Keyingisi: ${left[0][1]} ${left[0][2]} →</button>` + actions;
+      } else {
+        headline = `${KD.find(x => x[0] === p)[2]}: ${PASS}% kerak edi`;
+        actions = `<button class="btn btn-brand btn-block" data-kd="${p}">🔁 Qayta urinish</button>` + actions;
+      }
+      actions += `<button class="btn btn-soft btn-block" data-gotoday>📅 Bugungi dars</button>`;
+    } else if (r.kind === "daily") {
+      const { lesson: ln, day: k, part: p, date } = r, wasPassed = passed(ln);
+      const best = (((S.days = S.days || {})[ln] = S.days[ln] || {})[k] = S.days[ln][k] || {});
+      best[p] = Math.max(best[p] || 0, pct);
+      if (date) {
+        // Bugungi topshiriq: Daily Tasks'ning 4 qismi bajarilsa — bonus va olov
+        const t = ((S.daily = S.daily || {})[date] = S.daily[date] || { n: ln, k, parts: {} });
+        t.parts[p] = Math.max(t.parts[p] || 0, pct);
+        if (!t.bonus && DAILY.every(([q]) => (t.parts[q] || 0) >= PASS)) {
+          t.bonus = true; bonus += XP_MISSION;
+          if (S.lastMission !== today()) { S.streak = S.lastMission === yesterday() && S.lastMission >= olovSince() ? S.streak + 1 : 1; S.lastMission = today(); }
+          pills.push(`<span class="pill gold">🔥 Olov: ${S.streak} kun</span>`, `<span class="pill gold">🎁 Daily Tasks bonusi +${XP_MISSION}</span>`);
+        }
+      } else pills.push(`<span class="pill soft">🧺 Practice box: bu mashq uchun ball berilmaydi</span>`);
+      // Unitning barcha kunlari va qismlari 80%+ bo'lsa — unit o'tildi
+      const lows = lesson(ln).days.map((_, i) => Math.min(...PARTS.map(([q]) => dayScore(ln, i, q) ?? 0)));
+      if (Math.min(...lows) >= PASS) S.lessons[ln] = Math.max(S.lessons[ln] || 0, Math.min(...lows));
+      const score = q => (date ? onTime(date, q) : dayScore(ln, k, q)) || 0;
+      const nextP = PARTS.find(([q]) => q !== p && score(q) < PASS);
+      const go = q => `data-dpart="${q}" data-n="${ln}" data-k="${k}" data-date="${date || ""}"`;
+      if (pct >= PASS) {
+        headline = nextP ? `✅ ${partLabel(p)} bajarildi!` : date ? "🎉 Bugungi barcha topshiriqlar bajarildi!" : "🎉 Bu kunning barcha mashqlari bajarildi!";
+        if (nextP) actions = `<button class="btn btn-brand btn-block" ${go(nextP[0])}>Keyingisi: ${partLabel(nextP[0])} →</button>` + actions;
+      } else {
+        headline = `${partLabel(p)}: ${PASS}% kerak edi`;
+        actions = `<button class="btn btn-brand btn-block" ${go(p)}>🔁 Qayta urinish</button>` + actions;
+      }
+      if (!wasPassed && passed(ln)) headline = `🎉 ${lname(ln)} to'liq o'tildi!`;
+      actions += date ? `<button class="btn btn-soft btn-block" data-gotoday>📅 Bugungi topshiriqlar</button>`
+        : `<button class="btn btn-soft btn-block" data-practice>🧺 Practice box</button>`;
+    } else if (r.kind === "lesson") {
+      const ln = r.lesson, wasPassed = passed(ln);
+      S.lessons[ln] = Math.max(S.lessons[ln] || 0, pct);
+      if (pct >= PASS) {
+        pills.push(chestPill(giveChest("wood")));
+        const nx = nextOf(ln);
+        if (!nx) headline = "🎉 Barcha darslar tugadi! 👑";
+        else if (wasPassed) headline = "Dars yana bir bor mustahkamlandi 💪";
+        else if (teacherOpened(nx)) headline = `🎉 ${lname(ln)} o'tildi! ${lname(nx)} ochildi 🔓`;
+        else headline = `🎉 ${lname(ln)} o'tildi! ${lname(nx)}ni ustoz darsda o'tgach ochadi 🔔`;
+        if (nx && teacherOpened(nx)) actions = `<button class="btn btn-brand btn-block" data-lesson="${nx}">${lname(nx)}ga o'tish →</button>` + actions;
+      } else {
+        headline = `Keyingi dars uchun ${PASS}% kerak`;
+        actions = `<button class="btn btn-brand btn-block" data-lesson="${ln}">🔁 Qayta urinish</button>` + actions;
+      }
+    } else if (r.kind === "cards") {
+      headline = pct >= PASS ? "Kartalaringiz kuchaydi! 🃏💪" : "Yana mashq qiling, kartalar kuchayadi 💪";
+      actions = `<button class="btn btn-brand btn-block" data-again>🃏 Yana 10 ta</button>` + actions;
+    } else if (r.kind === "lis") {
+      // 🎧 Darajali tinglash: bosqichning eng yaxshi natijasi saqlanadi, 80% — keyingi bosqich ochiladi
+      const { lesson: ln, stage: k } = r, was = lisDone(ln);
+      const a = ((S.lis = S.lis || {})[ln] = S.lis[ln] || []);
+      a[k] = Math.max(a[k] || 0, pct);
+      if (pct >= PASS) {
+        if (k < 3) {
+          headline = `✅ ${k + 1}-bosqich o'tildi! Endi: ${LIS_ST[k + 1]}`;
+          actions = `<button class="btn btn-brand btn-block" data-lstage="${k + 1}">${k + 2}-bosqichga o'tish →</button>` + actions;
+        } else {
+          const st = starsOf(a.slice(0, 4)), nx = nextOf(ln);
+          headline = `🎉 ${lname(ln)} tinglash darsi tugadi! ${"★".repeat(st)}${"☆".repeat(3 - st)}`;
+          if (!was && nx && courseOpen(nx, lisDone)) actions = `<button class="btn btn-brand btn-block" data-lnext="${nx}">🎧 ${lname(nx)}ga o'tish →</button>` + actions;
+          if (st < 3) pills.push(`<span class="pill soft">⭐ 3 yulduz uchun bosqichlarni 95%+ bilan qayta ishlang</span>`);
+        }
+      } else {
+        headline = `Keyingi bosqich uchun ${PASS}% kerak`;
+        actions = `<button class="btn btn-brand btn-block" data-lstage="${k}">🔁 Qayta tinglash</button>` + actions;
+      }
+      actions += `<button class="btn btn-soft btn-block" data-lpath>🎧 Tinglash darslari</button>`;
+    } else if (r.kind === "listen") {
+      headline = pct >= 70 ? "Qulog'ingiz arabchaga o'rganyapti 🎧" : "Yana tinglang, har safar osonlashadi 💪";
+      actions = `<button class="btn btn-brand btn-block" data-again>🎧 Yana tinglash</button>` + actions;
+    } else if (r.kind === "review") {
+      const left = Object.keys(S.mistakes).length;
+      pills.push(`<span class="pill green">🩹 Tuzatildi: ${r.fixed} ta</span>`);
+      headline = left ? `Ro'yxatda qoldi: ${left} ta` : "🎉 Xatolar ro'yxati bo'sh!";
+      if (left) actions = `<button class="btn btn-brand btn-block" data-again>🔁 Yana takrorlash</button>` + actions;
+    } else if (r.kind === "exam") {
+      S.examBest = Math.max(S.examBest || 0, pct);
+      for (const [sk] of EXAM_PLAN) {
+        const [c, t] = r.bySkill[sk] || [0, 0];
+        if (t) lines.push(`<div><span>${SKILLS[sk]}</span><b>${c}/${t} · ${Math.round(c * 100 / t)}%</b></div>`);
+      }
+      if (pct >= PASS) { bonus += XP_EXAM; headline = "✅ Pre-A1 darajasi: o'tdingiz!"; pills.push(`<span class="pill gold">🎁 +${XP_EXAM} bonus</span>`); }
+      else headline = `Hozircha ${PASS}% ga yetmadi. Yana tayyorlanib, qayta urinib ko'ring 💪`;
+    }
+
+    const newBadges = checkBadges(flash);
+    const res = await saveResult(r.practice, bonus, kdKind || r.kind, r.answers);
+    const earned = (res.granted || 0) + (res.bonus || 0);
+    if (r.kind === "lesson" && pct >= PASS && !res.offline) refClaim();
+    if (res.capped) pills.push(`<span class="pill soft">🎯 Bugungi ${DAILY_CAP} XP chegarasi to'ldi, mashq davom etsin 💪</span>`);
+    if (res.offline) pills.push(`<span class="pill soft">📶 Internet yo'q, natija keyin yuboriladi</span>`);
+    if (res.failed) pills.push(`<span class="pill soft">⚠️ Natija saqlanmadi. Ilovani yopib, qayta oching</span>`);
+    if (r.kind !== "review" && r.right < n && Object.keys(S.mistakes).length) pills.push(`<span class="pill soft">❌ Xatolar «Xatolarim» bo'limiga tushdi</span>`);
+
+    if (!run || run !== r) return;
+    sfx(pct >= PASS ? "win" : "done"); if (newBadges.length) sfx("badge");
+    $("#quiz-in").innerHTML = `
+      <div class="result">
+        <div class="q-meta">${esc(r.title)}</div>
+        <div class="score">${r.right}/${n}</div>
+        <div style="font-family:var(--f-display);font-weight:600;font-size:17px;text-wrap:balance">${headline}</div>
+        <div class="gain"><span class="pill green">⭐ +${earned} XP</span>${pills.join("")}</div>
+        ${lines.length ? `<div class="lines">${lines.join("")}</div>` : ""}
+        ${newBadges.map(b => `<div class="new-badge">🏅 Yangi nishon: ${b[1]} ${esc(b[2])}</div>`).join("")}
+        <div class="actions">${actions}</div>
+      </div>`;
+    bindResultButtons(r.kind);
+  }
+
+  function bindResultButtons(kind) {
+    $("[data-home]").onclick = closeRun;
+    const again = $("[data-again]"); if (again) again.onclick = () => ({ mission: startMission, fonmission: startFonMission, listen: startListen, review: startReview, cards: startCards })[kind]();
+    const nextL = $("[data-lesson]"); if (nextL) nextL.onclick = () => startLesson(+nextL.dataset.lesson);
+    const pu = $("[data-push]"); if (pu) pu.onclick = () => { pushEnable(); pu.remove(); };
+    const dp = $("[data-dpart]"); if (dp) dp.onclick = () => startDaily(+dp.dataset.n, +dp.dataset.k, dp.dataset.dpart, dp.dataset.date || null);
+    const gt = $("[data-gotoday]"); if (gt) gt.onclick = () => { closeRun(); showTab("today"); };
+    const kdb = $("[data-kd]"); if (kdb) kdb.onclick = () => startKD(kdb.dataset.kd);
+    const pb = $("[data-practice]"); if (pb) pb.onclick = () => { closeRun(); practiceSheet(); };
+    const ls = $("[data-lstage]"); if (ls) { const ln = run.lesson; ls.onclick = () => startLisStage(ln, +ls.dataset.lstage); }
+    const lx = $("[data-lnext]"); if (lx) lx.onclick = () => { closeRun(); lisLessonSheet(+lx.dataset.lnext); };
+    const lp = $("[data-lpath]"); if (lp) lp.onclick = () => { closeRun(); lisPath(); };
+  }
+
+  // ---------- Do'stni taklif qilish ----------
+  let REF = {};
+  const REF_BONUS = 100;
+  const refLink = () => `${location.origin}${location.pathname}?ref=${REF.code}`;
+  async function loadRef() {
+    try { REF = await rpc("ref_info", { p_token: TOKEN }); } catch { return; }
+    $("#p-ref-stat").textContent = REF.invited || REF.pending
+      ? `✅ ${REF.invited} ta do'st qo'shildi${REF.pending ? ` · ⏳ ${REF.pending} ta birinchi darsini kutmoqda` : ""}`
+      : `Do'stingiz birinchi darsini o'tsa, ikkalangizga +${REF_BONUS} XP`;
+    if (checkBadges().length) saveResult(0, 0, "badge", []);
+  }
+  async function refClaim() {
+    try {
+      const r = await rpc("ref_claim", { p_token: TOKEN });
+      if (r.ok) { ME.xp += REF_BONUS; render(); toast(`🎁 ${r.inviter} sizni taklif qilgan edi: ikkalangizga +${REF_BONUS} XP!`); }
+    } catch { /* keyingi safar */ }
+  }
+  function shareInvite() {
+    if (!REF.code) return toast(ERRORS.NET);
+    const text = `Men «Mundil.uz» ilovasida arab tilini o'yin orqali o'rganyapman 🔥 Qo'shil, birga o'rganamiz! Birinchi darsni o'tsang, ikkalamizga +${REF_BONUS} XP 🎁`;
+    const url = refLink();
+    const tg = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+    sheet(`<h3>🎁 Do'stni taklif qilish</h3>
+      <p>Havolani do'stingizga yuboring. U ro'yxatdan o'tib, <b style="color:var(--ink)">birinchi darsini 80% bilan</b> o'tsa, ikkalangizga <b style="color:var(--ink)">+${REF_BONUS} XP</b>. 3 ta do'st olib kelsangiz, 🤝 «Elchi» nishoni.</p>
+      <div class="card" style="padding:10px 14px;word-break:break-all;font-size:13.5px">${esc(url)}</div>
+      <a class="btn btn-brand btn-block" href="${tg}" target="_blank" rel="noopener">✈️ Telegram orqali yuborish</a>
+      <button class="btn btn-soft btn-block" id="ref-copy">📋 Havolani nusxalash</button>
+      <button class="btn btn-soft btn-block" data-close>Yopish</button>`);
+    $("#ref-copy").onclick = async () => {
+      try { await navigator.clipboard.writeText(`${text}\n${url}`); toast("📋 Nusxalandi, endi do'stingizga yuboring"); }
+      catch { toast("Havolani bosib turib nusxalang"); }
+    };
+  }
+
+  // ---------- Nishonlar ----------
+  function checkBadges(flash = false) {
+    const have = new Set(S.badges);
+    const got = {
+      first: !!S.lastMission, fire7: S.streak >= 7, fire30: S.streak >= 30, flash,
+      perfect: Object.values(S.lessons).some(v => v === 100),
+      lessons3: Object.values(S.lessons).filter(v => v >= PASS).length >= 3,
+      duel1: (S.c.duel_win || 0) >= 1,
+      ear50: (S.c.listen_ok || 0) >= 50, fixer20: (S.c.fixed || 0) >= 20, wotd10: (S.c.wotd_ok || 0) >= 10,
+      exam: (S.examBest || 0) >= PASS, xp1000: (ME ? ME.xp : 0) >= 1000,
+      elchi: (REF.invited || 0) >= 3,
+    };
+    const fresh = BADGES.filter(b => got[b[0]] && !have.has(b[0]));
+    fresh.forEach(b => S.badges.push(b[0]));
+    return fresh;
+  }
+
+  // ---------- Boshlash tugmalari ----------
+  const startMission = () => startRun("mission", build(groupLessons(), 5));
+  const startListen = () => startRun("listen", build(groupLessons(), 8, ["listening"]));
+
+  // ---------- 🎧 Darajali tinglash va 🎤 gapirish darslari (2026-10-05, ustoz tasdiqlagan maket) ----------
+  // Har bir darslik bo'limiga mos, 4 bosqichdan. Bo'lim ketma-ket ochiladi (darajaning birinchisi — ustoz ochgani yetarli).
+  const LIS_ST = ["Tovushni farqlash", "So'zni topish", "Ibora ma'nosi", "Suhbatni tushunish"];
+  const SPK_ST = ["Tinglab takrorlash", "Savolga javob", "Vaziyat haqida gapirish", "Erkin mavzu"];
+  const lisOf = n => ((S.lis || {})[n] || []);
+  const lisDone = n => [0, 1, 2, 3].every(k => (lisOf(n)[k] || 0) >= PASS);
+  const starsOf = arr => { const a = arr.filter(x => x != null); if (a.length < 4) return 0; const avg = a.reduce((s, x) => s + x, 0) / a.length; return avg >= 95 ? 3 : avg >= 88 ? 2 : 1; };
+  const courseOpen = (n, done) => teacherOpened(n) && (!prevOf(n) || levelOf(prevOf(n)) !== levelOf(n) || done(prevOf(n)));
+
+  // Tinglash bosqichlari uchun savollar (mavjud dars ma'lumotidan)
+  const lPhrase = d => { const p = pick(d.phrases); return Q("l_phrase", "listening", p.ar, "🎧 Eshiting. Bu ibora nima degani?", options(p.uz, d.phrases.map(x => x.uz)), { audio: p.ar, hint: `${p.ar}: ${p.uz}` }); };
+  function lisStageQs(n, k) {
+    const d = lesson(n), seen = new Set(), out = [];
+    // ovozi bor savollargina olinadi (ma'lumot yetmasa — xato emas, shunchaki kamroq savol)
+    const take = (fn, cnt) => { for (let t = 0; out.length < cnt && t < cnt * 25; t++) { let q; try { q = fn(); } catch { continue; } if (q && !seen.has(q.key) && (!q.audio || D.audio[q.audio])) { seen.add(q.key); out.push(q); } } };
+    if (k === 0) {
+      take(() => (d.letters && d.letters.length ? M.l_letter(d) : M.l_word(d)), 6);
+      // Darsda 3–4 ta harf bo'lsa, 6 taga oldin o'tilgan harflar bilan to'ldiriladi (takrorlash)
+      if (out.length < 6 && d.letters) {
+        const prev = D.lessons.filter(l => l.number < n && l.letters && l.letters.length <= 6).flatMap(l => l.letters);
+        take(() => M.l_letter({ letters: prev.length >= 6 - out.length ? prev : ALPHABET }), 6);
+      }
+    }
+    if (k === 1) take(() => (Math.random() < 0.5 ? M.l_word(d) : M.l_mean(d)), 6);
+    if (k === 2) { if ((d.phrases || []).length >= 4) take(() => lPhrase(d), 6); take(() => M.l_dialog(d), 6); take(() => M.l_mean(d), 6); }
+    if (k === 3) {
+      // Mini suhbat: 4 juft «savol (erkak) — javob (ayol)», keyin har biri bo'yicha savol
+      const pairs = shuffle(d.dialogs || []).slice(0, 4);
+      if (pairs.length < 2) { take(() => M.l_mean(d), 6); return out; }
+      const dialog = pairs.flatMap(p => [p.say, "F|" + p.reply]);
+      pairs.forEach((p, i) => out.push({ ...Q("l_conv", "listening", p.say, `Suhbatda <b>«${p.say}»</b> deyildi.\n\nUnga qanday javob berildi?`, options(p.reply, (d.dialogs || []).map(x => x.reply))),
+        dialog, ins: INS.lmc, hint: `${p.say} — ${p.reply}` }));
+    }
+    return out;
+  }
+  function startLisStage(n, k) {
+    const qs = lisStageQs(n, k);
+    if (!qs.length) return toast("Bu bosqich uchun ovozli material yo'q");
+    const conv = !!qs[0].dialog;
+    startRun("lis", qs, { lesson: n, stage: k, title: `🎧 ${lname(n)} · ${k + 1}/4 · ${LIS_ST[k]}`, intro: conv, hadIntro: conv });
+  }
+  function lisPath() {
+    const ls = groupLessons();
+    sheet(`<h3>🎧 Tinglash darslari</h3><p>Har bir dars 4 bosqich: tovush → so'z → ibora → suhbat. Har bosqichdan ${PASS}% oling.</p>
+      <div class="parts">${ls.map(l => {
+        const n = l.number, open = courseOpen(n, lisDone), sc = lisOf(n), done = lisDone(n), st = starsOf(sc.slice(0, 4));
+        const prog = [0, 1, 2, 3].filter(k => (sc[k] || 0) >= PASS).length;
+        return `<button class="part ${done ? "done" : open ? "next" : ""} ${open ? "" : "locked-row"}" data-lis="${n}">
+          <span class="part-ic">${done ? "✓" : open ? "🎧" : "🔒"}</span>
+          <span class="t"><b>${esc(lname(n))} · <span class="ar">${esc(l.title)}</span></b>
+          <small>${done ? `<span class="stars">${"★".repeat(st)}${"☆".repeat(3 - st)}</span>` : open ? `${prog}/4 bosqich` : "oldingi darsni tugating"}</small>
+          <span class="st4">${[0, 1, 2, 3].map(k => `<i class="${(sc[k] || 0) >= PASS ? "on" : ""}"></i>`).join("")}</span></span><span class="go">›</span></button>`;
+      }).join("")}</div>
+      <button class="btn btn-soft btn-block" id="lis-mix">🎲 Aralash tinglash mashqi</button>
+      <button class="btn btn-soft btn-block" data-close>Yopish</button>`);
+    $("#lis-mix").onclick = () => { closeSheet(); startListen(); };
+    $$("[data-lis]").forEach(b => (b.onclick = () => {
+      const n = +b.dataset.lis;
+      if (!courseOpen(n, lisDone)) return toast(teacherOpened(n) ? "🔒 Avval oldingi tinglash darsini tugating" : "🔒 Bu darsni ustoz hali ochmagan");
+      lisLessonSheet(n);
+    }));
+    setTimeout(() => { const c = $(".part.next"); if (c) c.scrollIntoView({ block: "center" }); }, 80);
+  }
+  function lisLessonSheet(n) {
+    const sc = lisOf(n);
+    sheet(`<h3>🎧 ${esc(lname(n))}</h3><p><span class="ar">${esc(lesson(n).title)}</span></p>
+      <div class="parts">${LIS_ST.map((name, k) => {
+        const ok = (sc[k] || 0) >= PASS, open = k === 0 || (sc[k - 1] || 0) >= PASS;
+        return `<button class="part ${ok ? "done" : open ? "next" : ""}" data-ls="${k}"><span class="part-ic">${ok ? "✓" : open ? k + 1 : "🔒"}</span>
+          <span class="t"><b>${k + 1}. ${name}</b><small>${sc[k] != null ? `eng yaxshi: ${sc[k]}%` : open ? "boshlash" : "oldingi bosqichni tugating"}</small></span><span class="go">›</span></button>`;
+      }).join("")}</div>
+      <button class="btn btn-soft btn-block" id="lis-back">← Tinglash darslari</button>`);
+    $("#lis-back").onclick = lisPath;
+    $$("[data-ls]").forEach(b => (b.onclick = () => {
+      const k = +b.dataset.ls;
+      if (k > 0 && (sc[k - 1] || 0) < PASS) return toast("🔒 Avval oldingi bosqichdan " + PASS + "% oling");
+      closeSheet(); startLisStage(n, k);
+    }));
+  }
+
+  // 🎤 Gapirish bosqichlari: yozuv ustozga boradi («Ovozlar»), baho shu yerda ⭐ bo'lib ko'rinadi
+  const spkOf = n => ((S.spk || {})[n] || []);
+  const spkDone = n => [0, 1, 2, 3].every(k => spkOf(n)[k]);
+  const spkTopic = (n, k) => `${lname(n)} · ${k + 1}/4 · ${SPK_ST[k]}`;
+  function spkTask(n, k) {
+    const d = lesson(n), tops = D.speaking.filter(t => t.lesson === n), seed = n * 7 + k;
+    const at = (a, i) => a[i % a.length];
+    if (k === 0) {
+      const src = [...(d.phrases || []).map(p => p.ar), ...(d.dialogs || []).map(x => x.say)].filter(t => D.audio[t]);
+      const m = src.length ? at(src, seed) : (tops[0] || {}).example;
+      return { title: spkTopic(n, k), task: "Namunani tinglang va xuddi shunday, aniq talaffuz bilan takrorlang.", example: m };
+    }
+    if (k === 1) {
+      const qs = (d.dialogs || []).filter(x => /[؟?]/.test(x.say));
+      const q = qs.length ? at(qs, seed) : at(d.dialogs || [{ say: "مَا اسْمُكَ؟", reply: "اِسْمِي ..." }], seed);
+      return { title: spkTopic(n, k), task: "Savolni tinglang va o'zingiz haqingizda to'liq gap bilan javob bering.", example: q.say,
+        helpers: q.reply.replace(/[،.؟!]/g, " ").split(/\s+/).filter(Boolean).slice(0, 5) };
+    }
+    const t = tops.length ? at(tops, k === 2 ? 0 : 1) : { task: "Bu dars mavzusida o'zingiz haqingizda gapiring.", example: "" };
+    return { title: spkTopic(n, k), task: (k === 3 ? "30–60 soniya erkin gapiring. " : "2–3 gap ayting. ") + t.task, example: t.example };
+  }
+  let SPK_GRADES = {};
+  async function loadSpkGrades() {
+    const mine = await loadSpeakBadge();
+    SPK_GRADES = {};
+    (mine || []).forEach(x => { if (!SPK_GRADES[x.topic] || x.score) SPK_GRADES[x.topic] = x.score || 0; });
+  }
+  async function spkPath() {
+    sheet(`<h3>🎤 Gapirish darslari</h3><p class="muted">Yuklanmoqda…</p>`);
+    await loadSpkGrades();
+    const ls = groupLessons();
+    sheet(`<h3>🎤 Gapirish darslari</h3><p>Har dars 4 bosqich: takrorlash → savolga javob → vaziyat → erkin mavzu. Ustoz baholaydi ⭐</p>
+      <div class="parts">${ls.map(l => {
+        const n = l.number, open = courseOpen(n, spkDone), sent = [0, 1, 2, 3].filter(k => spkOf(n)[k]).length;
+        const grades = [0, 1, 2, 3].map(k => SPK_GRADES[spkTopic(n, k)]).filter(x => x);
+        const avg = grades.length ? (grades.reduce((a, b) => a + b, 0) / grades.length).toFixed(1) : null;
+        const waiting = [0, 1, 2, 3].filter(k => spkOf(n)[k] && !SPK_GRADES[spkTopic(n, k)]).length;
+        return `<button class="part ${sent === 4 ? "done" : open ? "next" : ""}" data-spk="${n}">
+          <span class="part-ic">${sent === 4 ? "✓" : open ? "🎤" : "🔒"}</span>
+          <span class="t"><b>${esc(lname(n))} · <span class="ar">${esc(l.title)}</span></b>
+          <small>${avg ? `<span class="stars">⭐ ${avg}/5</span>&nbsp; ` : ""}${open ? `${sent}/4 bosqich${waiting ? ` · ⏳ ${waiting} ta baholanmoqda` : ""}` : "oldingi darsni tugating"}</small>
+          <span class="st4">${[0, 1, 2, 3].map(k => `<i class="${spkOf(n)[k] ? "on" : ""}"></i>`).join("")}</span></span><span class="go">›</span></button>`;
+      }).join("")}</div>
+      <button class="btn btn-soft btn-block" id="spk-free">🎲 Erkin mavzu (eski usul)</button>
+      <button class="btn btn-soft btn-block" data-close>Yopish</button>`);
+    $("#spk-free").onclick = () => speakSheet();
+    $$("[data-spk]").forEach(b => (b.onclick = () => {
+      const n = +b.dataset.spk;
+      if (!courseOpen(n, spkDone)) return toast(teacherOpened(n) ? "🔒 Avval oldingi gapirish darsini tugating" : "🔒 Bu darsni ustoz hali ochmagan");
+      spkLessonSheet(n);
+    }));
+    setTimeout(() => { const c = $(".part.next"); if (c) c.scrollIntoView({ block: "center" }); }, 80);
+  }
+  function spkLessonSheet(n) {
+    sheet(`<h3>🎤 ${esc(lname(n))}</h3><p><span class="ar">${esc(lesson(n).title)}</span></p>
+      <div class="parts">${SPK_ST.map((name, k) => {
+        const sent = spkOf(n)[k], g = SPK_GRADES[spkTopic(n, k)], open = k === 0 || spkOf(n)[k - 1];
+        return `<button class="part ${sent ? "done" : open ? "next" : ""}" data-sk="${k}"><span class="part-ic">${sent ? "✓" : open ? k + 1 : "🔒"}</span>
+          <span class="t"><b>${k + 1}. ${name}</b><small>${g ? `${"⭐".repeat(g)}${"☆".repeat(5 - g)}` : sent ? "⏳ ustoz baholamoqda" : open ? "boshlash" : "oldingi bosqichni bajaring"}</small></span><span class="go">›</span></button>`;
+      }).join("")}</div>
+      <button class="btn btn-soft btn-block" id="spk-back">← Gapirish darslari</button>`);
+    $("#spk-back").onclick = spkPath;
+    $$("[data-sk]").forEach(b => (b.onclick = () => {
+      const k = +b.dataset.sk;
+      if (k > 0 && !spkOf(n)[k - 1]) return toast("🔒 Avval oldingi bosqichni bajaring");
+      spkStageSheet(n, k);
+    }));
+  }
+  function spkStageSheet(n, k) {
+    dropRecording();
+    const t = spkTask(n, k);
+    t.onSent = () => {
+      S.spk = S.spk || {}; const a = (S.spk[n] = S.spk[n] || []); a[k] = 1;
+      saveResult(0, 0, "speak_course", []);
+      setTimeout(() => toast(k < 3 ? "✅ Yuborildi! Keyingi bosqich ochildi" : "🎉 Dars tugadi! Ustoz baholagach ⭐ ko'rinadi"), 600);
+    };
+    sheet(`<h3>🎤 ${esc(lname(n))} · ${k + 1}/4</h3>
+      <p><b style="color:var(--ink)">${SPK_ST[k]}</b><br>${esc(t.task)}</p>
+      ${t.example ? `<div class="q-card"><div class="ar" style="font-size:24px;font-weight:700;line-height:1.9">${esc(t.example)}</div>
+        ${D.audio[t.example] ? `<button class="listen" id="sp-play" aria-label="Tinglash">🔊</button>` : ""}</div>` : ""}
+      ${t.helpers && t.helpers.length ? `<div class="card" style="padding:10px 12px"><small class="muted">💡 Yordamchi so'zlar:</small><div>${t.helpers.map(w => `<span class="chip ar" style="font-size:17px;margin:3px">${esc(w)}</span>`).join("")}</div></div>` : ""}
+      <div class="rec" id="rec"></div>
+      <button class="btn btn-soft btn-block" id="spk-back2">← Bosqichlar</button>`);
+    const sp = $("#sp-play"); if (sp) sp.onclick = () => play(t.example);
+    $("#spk-back2").onclick = () => { dropRecording(); spkLessonSheet(n); };
+    recStage("idle", t);
+    if (D.audio[t.example] && k < 2) setTimeout(() => play(t.example), 400);
+  }
+  function startReview() {
+    const all = shuffle(Object.values(S.mistakes)).slice(0, 10).map(m => reshuffle(m.q));
+    if (!all.length) return toast("🎉 Xatolar ro'yxatingiz bo'sh!");
+    startRun("review", all);
+  }
+  function startLesson(n) {
+    if (!teacherOpened(n)) return toast("🔒 Bu darsni ustoz hali ochmagan");
+    if (!isOpen(n)) return toast(`🔒 Avval ${lname(prevOf(n))}dan ${PASS}% oling`);
+    if (hasParts(n)) return unitSheet(n);
+    startRun("lesson", build([lesson(n)], n > 100 ? 15 : 10, undefined, true), { lesson: n, title: lname(n) });
+  }
+  function startExam() {
+    if (!ME.group.exam_open) return toast("🎓 Imtihonni ustoz hali ochmagan");
+    sheet(`<h3>🎓 CEFR sinov imtihoni</h3>
+      <p>Ochiq darslar bo'yicha 20 ta savol: 📖 o'qish (8), ✏️ grammatika (6), 🎧 tinglash (6). O'tish uchun ${PASS}% kerak.</p>
+      <button class="btn btn-brand btn-block" id="exam-go">Boshlash</button><button class="btn btn-soft btn-block" data-close>Keyinroq</button>`);
+    $("#exam-go").onclick = () => { closeSheet(); startRun("exam", buildExam(groupLessons())); };
+  }
+
+  // ---------- Duel ----------
+  let INBOX = { incoming: [], waiting: [], results: [] }, inboxChest = null;
+  async function loadInbox() {
+    try {
+      INBOX = await rpc("duel_inbox", { p_token: TOKEN });
+      const n = INBOX.incoming.length;
+      $("#duel-count").hidden = !n; $("#duel-count").textContent = n;
+      // Yangi g'alabalarni hisoblash (nishon uchun)
+      const wins = INBOX.results.filter(r => r.outcome === "win").map(r => r.id);
+      const seen = new Set(S.c.duel_seen || []);
+      const newWins = wins.filter(id => !seen.has(id));
+      if (newWins.length) {
+        S.c.duel_win = (S.c.duel_win || 0) + newWins.length;
+        S.c.duel_seen = [...seen, ...newWins].slice(-50);
+        checkBadges();
+        // 🧪 Har bir yangi g'alaba uchun oltin sandiq (10% — sehrli)
+        newWins.forEach(() => { const t = giveChest(Math.random() < 0.1 ? "magic" : "gold"); if (t) inboxChest = t; });
+        if (inboxChest) { saveResult(0, 0, "chest", []); renderChests(); if (!run) { toast(`🎁 Duel g'alabasi uchun ${CHESTS[inboxChest][1].toLowerCase()} sandiq!`); inboxChest = null; } }
+      }
+    } catch { /* internet bo'lmasa, keyinroq */ }
+  }
+
+  // ---------- 🧪 SINOV: 🏆 kuboklar va arenalar (faqat ustoz o'quvchi sifatida kirganda ko'rinadi) ----------
+  // 2026-10-04: Clash Royale'dan olingan narsalar (kubok/arenalar, sandiqlar, kartalar) vaqtincha yashirildi (ustoz qarori).
+  // Kod saqlangan — qaytarish uchun quyidagilarni yoqish kifoya.
+  const BETA = () => false;         // sandiq va kartalar (oldin: !!TT — faqat ustoz ko'rardi)
+  const TROPHY_ON = () => false;    // kubok va arena yo'li
+  // Sayohat xaritasi: O'zbekistondan arab dunyosigacha. [kubok, bayroq, davlat, belgisi]
+  const ARENAS = [[0, "🇺🇿", "O'zbekiston", "🏺"], [150, "🇰🇿", "Qozog'iston", "🦅"], [300, "🇹🇲", "Turkmaniston", "🐎"],
+    [500, "🇦🇿", "Ozarbayjon", "🔥"], [750, "🇹🇷", "Turkiya", "🎈"], [1050, "🇯🇴", "Iordaniya", "🏜️"], [1400, "🇪🇬", "Misr", "🐫"],
+    [1800, "🇦🇪", "BAA", "🏙️"], [2300, "🇸🇦", "Saudiya Arabistoni", "🌴"], [2900, "🇲🇦", "Marokash", "🍊"]];
+  const TROPHY = { win: 30, lose: -20, draw: 5 };
+  const arenaIdx = t => ARENAS.filter(a => t >= a[0]).length - 1;
+  let TROPHIES = null;
+  async function loadTrophies() {
+    try { TROPHIES = await rpc("trophies_board", { p_token: TOKEN }); } catch { /* keyinroq */ }
+    return TROPHIES;
+  }
+  function arenaCard(t) {
+    const i = arenaIdx(t), [from, flag, name, ic] = ARENAS[i], next = ARENAS[i + 1];
+    const pct = next ? Math.round((t - from) * 100 / (next[0] - from)) : 100;
+    return `<button class="arena" id="arena-open"><span class="arena-ic">${ic}</span><span class="t"><small>${cap(MONTHS[new Date().getMonth()])} mavsumi · 🗺 xaritani ochish uchun bosing</small><b>${flag} ${name}</b>
+      <span class="bar"><i style="width:${pct}%"></i></span><small>${next ? `${next[1]} ${next[2]}gacha: ${next[0] - t} 🏆` : "Butun xarita zabt etildi! 👑"}</small></span>
+      <span class="arena-tr">🏆 ${t}</span></button>`;
+  }
+  // Multfilm uslubidagi xarita: dengizdagi orolchalar, pastdan yuqoriga yo'l, o'quvchi avatari hozirgi davlatda
+  const MAP_X = [50, 74, 70, 40, 22, 34, 64, 80, 58, 30];
+  const MAP_DECO = [["☁️", 8, 4], ["⛵", 86, 12], ["🐠", 12, 22], ["☁️", 70, 31], ["🐬", 88, 44], ["⛵", 6, 52], ["☁️", 48, 61], ["🐠", 90, 72], ["🌊", 8, 82], ["☁️", 78, 91]];
+  function worldMap(t) {
+    const n = ARENAS.length, step = 112, h = n * step + 40, cur = arenaIdx(t);
+    const pos = i => ({ x: MAP_X[i % MAP_X.length], y: h - 70 - i * step });   // pastdan yuqoriga
+    const path = ARENAS.slice(1).map((_, i) => { const a = pos(i), b = pos(i + 1); return `<path class="${i < cur ? "done" : ""}" vector-effect="non-scaling-stroke" d="M${a.x} ${a.y} C${a.x} ${(a.y + b.y) / 2} ${b.x} ${(a.y + b.y) / 2} ${b.x} ${b.y}"/>`; }).join("");
+    const mine = avaSvg(S.avatar);
+    return `<div class="wmap" id="wmap" style="height:${h}px">
+      <svg viewBox="0 0 100 ${h}" preserveAspectRatio="none" aria-hidden="true">${path}</svg>
+      ${MAP_DECO.map(([e, x, y]) => `<span class="deco" style="left:${x}%;top:${y}%">${e}</span>`).join("")}
+      ${ARENAS.map(([from, flag, name, ic], i) => { const p = pos(i), st = i < cur ? "done" : i === cur ? "here" : "locked";
+        return `<div class="isle ${st}" style="left:${p.x}%;top:${p.y}px">
+          ${i === cur ? `<span class="pin">${mine || "📍"}</span>` : ""}
+          <span class="land">${ic}</span><span class="lbl"><b>${flag} ${name}</b><small>${st === "locked" ? `🔒 ${from} 🏆` : st === "done" ? "✅ ochilgan" : "📍 siz shu yerdasiz"}</small></span></div>`; }).join("")}
+    </div>`;
+  }
+  function trophySheet() {
+    const b = TROPHIES || { board: [], mine: 0, me: null };
+    sheet(`<h3>🗺 Sayohat xaritasi</h3>
+      <p>Duelda yutsangiz <b style="color:var(--ink)">+30 🏆</b>, yutqazsangiz <b style="color:var(--ink)">−20 🏆</b>, durang <b style="color:var(--ink)">+5</b>. Kubok yig'ib, yangi davlatlarni oching! Har oy yangi mavsum.</p>
+      ${worldMap(b.mine)}
+      <h3 style="font-size:15px;margin-top:6px">Guruhda kubok reytingi</h3>
+      <div class="card">${b.board.length ? b.board.map((r, i) => `<div class="prog-row"><span class="rk">${i + 1}</span>${avaHtml(r.ava, r.name)}
+        <span class="nm"><b>${esc(r.name)}${r.id === b.me ? " (siz)" : ""}</b><small>${ARENAS[arenaIdx(r.tr)][1]} ${ARENAS[arenaIdx(r.tr)][2]}</small></span><span class="val">🏆 ${r.tr}</span></div>`).join("")
+        : `<p class="muted">Bu mavsumda hali hech kim kubok yutmadi. Birinchi bo'ling! ⚔️</p>`}</div>
+      <button class="btn btn-soft btn-block" data-close>Yopish</button>`);
+    // xaritada hozirgi davlatga aylantiramiz
+    setTimeout(() => { const h = $(".isle.here"); if (h) h.scrollIntoView({ block: "center" }); }, 60);
+  }
+
+  // ---------- 🌍 Dunyo sayohati: haqiqiy xarita (Natural Earth), umumiy XP bilan davlatlar ochiladi ----------
+  // Davlatlar O'zbekistondan uzoqligi bo'yicha tartiblangan (worldmap.js). i-davlat uchun kerakli XP: 30·i + 1.6·i² (O'zbekiston — 0).
+  const WORLD_N = 236;
+  const worldNeed = i => i <= 0 ? 0 : Math.round(30 * i + 1.6 * i * i);
+  const worldOpened = xp => { let n = 0; while (n < WORLD_N && xp >= worldNeed(n)) n++; return n; };
+  const flag = code => code === "XK" ? "🏳️" : String.fromCodePoint(...[...code].map(ch => 127397 + ch.charCodeAt(0)));
+  let worldLoading = null;
+  const loadWorld = () => worldLoading || (worldLoading = new Promise((ok, bad) => {
+    if (window.DOD_WORLD) return ok(window.DOD_WORLD);
+    const s = document.createElement("script"); s.src = "worldmap.js?v=1"; s.onload = () => ok(window.DOD_WORLD); s.onerror = () => { worldLoading = null; bad(); };
+    document.head.appendChild(s);
+  }));
+
+  // 2026-10-04: xarita DUEL bilan ochiladi (ustoz qarori): yutsa +1 davlat, yutqazsa −1, har 10-davlat «qal'a» (pastga tushmaydi)
+  let WORLDB = null;
+  async function loadWorldPos() { try { WORLDB = await rpc("world_board", { p_token: TOKEN }); } catch { /* keyinroq */ } return WORLDB; }
+  const worldPos = () => (WORLDB ? WORLDB.mine.pos : 1);
+  const fortOf = p => Math.max(1, Math.floor(p / 10) * 10);
+  function renderWorldCard() { const box = $("#world-card"); if (box) box.innerHTML = ""; }   // bosh sahifada endi yo'q — duelda
+  function worldDuelCard() {
+    const p = worldPos(), best = WORLDB ? WORLDB.mine.best : 1, nextFort = Math.min(WORLD_N, (Math.floor(p / 10) + 1) * 10);
+    return `<button class="world-card" id="world-open"><span class="wc-ic">🌍</span><span class="t"><b>Dunyo xaritasi · ${p}/${WORLD_N}</b>
+      <span class="bar"><i style="width:${Math.round(p * 100 / WORLD_N)}%"></i></span>
+      <small>Yutsangiz +1 davlat, yutqazsangiz −1 · 🏰 ${best >= 10 ? `himoya: ${fortOf(best)}-davlat` : `birinchi qal'a: 10-davlat`} · keyingi qal'a: ${nextFort}</small></span><span class="go">›</span></button>`;
+  }
+  async function openWorld() {
+    let W;
+    try { W = await loadWorld(); } catch { return toast(ERRORS.NET); }
+    const fromDuel = !!$("#duel-new"); closeSheet();
+    const n = worldPos(), PAL = ["#ffd6a5", "#caffbf", "#9bf6ff", "#bdb2ff", "#ffc6ff", "#fdffb6", "#a0c4ff", "#ffadad", "#d0f4de", "#fcd5ce"];
+    const ov = document.createElement("section"); ov.className = "world"; ov.id = "world";
+    const nextC = W.c[n];
+    ov.innerHTML = `<div class="world-top"><button class="x" id="w-close" aria-label="Yopish">✕</button>
+        <div class="t"><b>🌍 Dunyo sayohati</b><small>${n}/${W.c.length} davlat · 🏰 himoya: ${fortOf(WORLDB ? WORLDB.mine.best : 1)} · ⭐ arab: ${W.c.slice(0, n).filter(c => c.a).length}/${W.c.filter(c => c.a).length}</small></div></div>
+      <div class="world-map" id="w-map"><svg id="w-svg" viewBox="0 0 ${W.w} ${W.h}" preserveAspectRatio="xMidYMid slice">
+        <defs><linearGradient id="w-sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fd8fb"/><stop offset="1" stop-color="#3a9ad9"/></linearGradient>
+          <pattern id="w-wave" width="24" height="12" patternUnits="userSpaceOnUse"><path d="M0 6 Q6 2 12 6 T24 6" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="1"/></pattern></defs>
+        <path d="${W.sphere}" fill="url(#w-sea)"/><path d="${W.sphere}" fill="url(#w-wave)" stroke="#2c6e9e" stroke-width="2"/>
+        ${W.c.map((c, i) => `<path class="wc ${i < n ? "on" : ""} ${i === n ? "next" : ""}" data-i="${i}" d="${c.d}" ${i < n ? `style="fill:${PAL[i % PAL.length]}"` : ""}/>`).join("")}
+        ${W.c.map((c, i) => c.a ? `<text class="wstar ${i < n ? "on" : ""}" x="${c.x}" y="${c.y}">⭐</text>` : "").join("")}
+        ${W.c.map((c, i) => (i + 1) % 10 === 0 ? `<text class="wstar wfort ${i < n ? "on" : ""}" x="${c.x}" y="${c.y}">🏰</text>` : "").join("")}
+        <g id="w-pin"></g></svg>
+        <div class="w-zoom"><button data-z="1.6" aria-label="Kattalashtirish">＋</button><button data-z="0.62" aria-label="Kichraytirish">－</button><button data-z="home" aria-label="O'zim turgan joy">📍</button></div>
+      </div>
+      <div class="world-info" id="w-info"><span>${nextC ? `🎯 Keyingisi: <b>${flag(nextC.k)} ${esc(nextC.n)}</b>${nextC.a ? " ⭐" : ""} — <b>1 ta duel g'alabasi</b>` : "👑 Butun dunyo sizniki!"}</span>
+        <small>⚔️ Yutsangiz yangi davlat, yutqazsangiz oxirgisi qo'ldan ketadi. 🏰 Har 10-davlat — qal'a: undan pastga tushmaysiz.</small>
+        ${WORLDB && WORLDB.board.length > 1 ? `<small>👥 Guruhda: ${WORLDB.board.slice(0, 3).map((r, i) => `${["🥇", "🥈", "🥉"][i]} ${esc(r.name)} — ${r.pos}`).join(" · ")}</small>` : ""}</div>
+      <small class="w-credit">Xarita: Natural Earth (ochiq ma'lumot)</small>`;
+    document.body.appendChild(ov); document.body.style.overflow = "hidden"; syncBack();
+    $("#w-close").onclick = () => { ov.remove(); document.body.style.overflow = ""; syncBack(); if (fromDuel) duelSheet(); };
+
+    // Surish va kattalashtirish (barmoq, sichqoncha, g'ildirak)
+    const svg = $("#w-svg"), home = W.c[Math.max(0, n - 1)];
+    let vb = { x: 0, y: 0, w: W.w, h: W.h };
+    const apply = () => {
+      svg.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+      const s = vb.w / W.w, r = 16 * s;   // avatar pin — ekranda bir xil kattalikda
+      const ava = avaSvg(S.avatar);
+      $("#w-pin").innerHTML = `<circle cx="${home.x}" cy="${home.y - r * 1.2}" r="${r}" fill="#fff" stroke="#ffd56b" stroke-width="${3 * s}"/>`
+        + (ava ? ava.replace("<svg ", `<svg x="${home.x - r * 0.9}" y="${home.y - r * 2.1}" width="${r * 1.8}" height="${r * 1.8}" `) : `<text x="${home.x}" y="${home.y - r * 0.8}" font-size="${r * 1.3}" text-anchor="middle">📍</text>`);
+      $$(".wstar").forEach(t => t.setAttribute("font-size", 9 * Math.max(0.35, s)));
+    };
+    const zoom = (k, cx = vb.x + vb.w / 2, cy = vb.y + vb.h / 2) => {
+      const w = Math.min(W.w, Math.max(W.w / 14, vb.w / k)), h = w * W.h / W.w;
+      vb = { x: cx - (cx - vb.x) * (w / vb.w), y: cy - (cy - vb.y) * (h / vb.h), w, h };
+      vb.x = Math.min(Math.max(vb.x, -vb.w * 0.3), W.w - vb.w * 0.7); vb.y = Math.min(Math.max(vb.y, -vb.h * 0.3), W.h - vb.h * 0.7);
+      apply();
+    };
+    const focusHome = () => { vb = { x: 0, y: 0, w: W.w, h: W.h }; zoom(1.7, home.x, home.y); vb.x = home.x - vb.w / 2; vb.y = home.y - vb.h / 2; apply(); };
+    focusHome();
+    // ekran nuqtasi → xarita koordinatasi (preserveAspectRatio="slice": ortiqcha qismi kesiladi)
+    const pt = e => { const r = svg.getBoundingClientRect(), s = Math.min(vb.w / r.width, vb.h / r.height); return { x: vb.x + (vb.w - r.width * s) / 2 + (e.clientX - r.left) * s, y: vb.y + (vb.h - r.height * s) / 2 + (e.clientY - r.top) * s, s }; };
+    const pts = new Map(); let moved = 0, pinch = 0;
+    svg.addEventListener("pointerdown", e => { svg.setPointerCapture(e.pointerId); pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); moved = 0; });
+    svg.addEventListener("pointermove", e => {
+      if (!pts.has(e.pointerId)) return;
+      const p = pts.get(e.pointerId), dx = e.clientX - p.x, dy = e.clientY - p.y;
+      if (pts.size === 1) {
+        const { s } = pt(e); vb.x -= dx * s; vb.y -= dy * s; moved += Math.abs(dx) + Math.abs(dy); apply();
+      } else if (pts.size === 2) {
+        const [a, b] = [...pts.values()], d0 = Math.hypot(a.x - b.x, a.y - b.y);
+        pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        const [a2, b2] = [...pts.values()], d1 = Math.hypot(a2.x - b2.x, a2.y - b2.y);
+        if (d0 > 0) { const m = pt({ clientX: (a2.x + b2.x) / 2, clientY: (a2.y + b2.y) / 2 }); zoom(d1 / d0, m.x, m.y); }
+        moved = 99; pinch = 1; return;
+      }
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    });
+    const up = e => { pts.delete(e.pointerId); if (!pts.size) setTimeout(() => (pinch = 0), 50); };
+    svg.addEventListener("pointerup", up); svg.addEventListener("pointercancel", up);
+    svg.addEventListener("wheel", e => { e.preventDefault(); const m = pt(e); zoom(e.deltaY < 0 ? 1.25 : 0.8, m.x, m.y); }, { passive: false });
+    $$(".w-zoom button").forEach(b => (b.onclick = () => b.dataset.z === "home" ? focusHome() : zoom(+b.dataset.z)));
+    // Davlatni bosish — nomi va holati
+    svg.addEventListener("click", e => {
+      const p = e.target.closest(".wc"); if (!p || moved > 6 || pinch) return;
+      const i = +p.dataset.i, c = W.c[i];
+      $("#w-info").innerHTML = `<span>${flag(c.k)} <b>${esc(c.n)}</b>${c.a ? " ⭐ arab davlati" : ""}</span><small>${i < n ? `✅ Ochilgan · ${i + 1}-davlat` : `🔒 ${i + 1}-davlat — yana ${i + 1 - n} ta duel g'alabasi`}${(i + 1) % 10 === 0 ? " · 🏰 qal'a" : ""}</small>`;
+      sfx("tap");
+    });
+  }
+
+  // ---------- 🧪 SINOV: 🎁 sandiqlar ----------
+  // Dars o'tsa — yog'och, kunlik missiya — kumush, duelda g'alaba — oltin (10% sehrli). 4 ta joy, bir vaqtda bittasi ochiladi.
+  const CHESTS = {
+    wood: ["🎁", "Yog'och", 30 * 60e3, [10, 20], 0.15], silver: ["🎁", "Kumush", 3 * 3600e3, [25, 40], 0.35],
+    gold: ["🎁", "Oltin", 8 * 3600e3, [50, 80], 0.7], magic: ["🔮", "Sehrli", 12 * 3600e3, [100, 100], 1],
+  };
+  const CHEST_SLOTS = 4;
+  const fmtLeft = ms => { const s = Math.ceil(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? `${h} soat ${m} daq` : m ? `${m} daq ${s % 60} s` : `${s} s`; };
+  function giveChest(type) {
+    if (!BETA()) return null;
+    S.chests = S.chests || [];
+    if (S.chests.length >= CHEST_SLOTS) { setTimeout(() => toast("🎁 Sandiq joylari to'la! Avval birini oching"), 1200); return null; }
+    S.chests.push({ t: type, at: null });
+    return type;
+  }
+  const chestPill = t => t ? `<span class="pill gold">🎁 ${CHESTS[t][1]} sandiq!</span>` : "";
+  function renderChests() {
+    const box = $("#chests");
+    box.hidden = !BETA();
+    if (!BETA()) return;
+    const list = S.chests || [], now = Date.now();
+    box.innerHTML = `<div class="chest-head"><b>🎁 Sandiqlar <small>🧪 sinov</small></b><small>dars · missiya · duel g'alabasi</small></div>
+      <div class="chest-row">${Array.from({ length: CHEST_SLOTS }, (_, i) => {
+        const c = list[i]; if (!c) return `<div class="chest empty"><span class="ci">＋</span><small>bo'sh joy</small></div>`;
+        const [ic, name, dur] = CHESTS[c.t], left = c.at ? c.at + dur - now : null;
+        const st = left == null ? `ochish: ${fmtLeft(dur)}` : left > 0 ? `⏳ <span data-left="${i}">${fmtLeft(left)}</span>` : "✨ Tayyor!";
+        return `<button class="chest ${c.t} ${left != null && left <= 0 ? "ready" : ""}" data-chest="${i}"><span class="ci">${ic}</span><b>${name}</b><small>${st}</small></button>`;
+      }).join("")}</div>`;
+    $$("[data-chest]").forEach(b => (b.onclick = () => chestTap(+b.dataset.chest)));
+  }
+  setInterval(() => {   // ochilayotgan sandiq soati
+    if (!BETA() || $("#screen-home").hidden) return;
+    const els = $$("[data-left]"); if (!els.length) return;
+    let ready = false;
+    els.forEach(el => { const c = (S.chests || [])[+el.dataset.left]; if (!c) return; const left = c.at + CHESTS[c.t][2] - Date.now(); if (left <= 0) ready = true; else el.textContent = fmtLeft(left); });
+    if (ready) renderChests();
+  }, 1000);
+  function chestTap(i) {
+    const c = S.chests[i], [ic, name, dur, xp, p] = CHESTS[c.t];
+    if (c.at && Date.now() >= c.at + dur) return openChest(i);
+    const busy = S.chests.some((x, j) => j !== i && x.at && Date.now() < x.at + CHESTS[x.t][2]);
+    sheet(`<div class="chest-open"><div class="big">${ic}</div><h3>${name} sandiq</h3>
+      <p>Ichida: <b style="color:var(--ink)">${xp[0] === xp[1] ? xp[0] : `${xp[0]}–${xp[1]}`} XP</b>${p >= 1 ? " va <b style='color:var(--ink)'>noyob buyum</b>" : ` va ${Math.round(p * 100)}% ehtimol bilan noyob avatar buyumi`}.</p></div>
+      ${c.at ? `<p class="muted" style="text-align:center">⏳ Ochilishiga: ${fmtLeft(c.at + dur - Date.now())}</p>`
+        : busy ? `<p class="muted" style="text-align:center">Bir vaqtda bitta sandiq ochiladi. Avvalgisi tugashini kuting.</p>`
+        : `<button class="btn btn-brand btn-block" id="ch-start">⏳ Ochishni boshlash (${fmtLeft(dur)})</button>`}
+      <button class="btn btn-soft btn-block" id="ch-fast">⚡ Tez ochish (faqat sinov uchun)</button>
+      <button class="btn btn-soft btn-block" data-close>Yopish</button>`);
+    const st = $("#ch-start"); if (st) st.onclick = () => { c.at = Date.now(); closeSheet(); renderChests(); saveResult(0, 0, "chest", []); };
+    $("#ch-fast").onclick = () => { closeSheet(); openChest(i); };
+  }
+  function openChest(i) {
+    const c = S.chests.splice(i, 1)[0], [ic, name, , xpR, p] = CHESTS[c.t];
+    const xp = xpR[0] + rnd(xpR[1] - xpR[0] + 1);
+    S.items = S.items || [];
+    const pool = AV ? Object.entries(AV.EXTRA).flatMap(([k, vs]) => vs.map(v => `${k}:${v}`)).filter(x => !S.items.includes(x)) : [];
+    const item = pool.length && Math.random() < p ? pick(pool) : null;
+    if (item) S.items.push(item);
+    const [ik, iv] = item ? item.split(":") : [];
+    const ITEM_NAME = { bg: "Kamalak fon", hc: "Noyob soch rangi", hj: "Noyob ro'mol rangi" };
+    const swatch = item ? (AV.GRAD[iv] ? `linear-gradient(135deg,#${AV.GRAD[iv][0]},#${AV.GRAD[iv][1]})` : `#${iv}`) : "";
+    sheet(`<div class="chest-open"><div class="big">${ic}</div><h3>${name} sandiq ochildi!</h3>
+      <div class="reward"><span style="font-size:30px">⭐</span><b>+${xp} XP</b></div>
+      ${item ? `<div class="reward"><span class="sw" style="background:${swatch}"></span><span><b>${ITEM_NAME[ik]}</b><br><small class="muted">Avatar konstruktorida ochildi 🔓</small></span></div>` : ""}</div>
+      ${item ? `<button class="btn btn-brand btn-block" id="ch-ava">🧑‍🎨 Avatarga qo'yish</button>` : ""}
+      <button class="btn btn-soft btn-block" data-close>Zo'r!</button>`);
+    sfx("win"); if (item) sfx("badge");
+    const a = $("#ch-ava"); if (a) a.onclick = () => { closeSheet(); avatarEditor(); };
+    saveResult(0, xp, "chest", []).then(() => render());
+    renderChests();
+  }
+
+  // ---------- 🧪 SINOV: 🃏 so'z kartalari ----------
+  // Har bir so'z — karta. To'g'ri topgan sari daraja oshadi (S.cards[ar] = to'g'ri javoblar soni).
+  const WORDS = new Map();
+  D.lessons.forEach(l => (l.words || []).forEach(w => { if (!WORDS.has(w.ar)) WORDS.set(w.ar, { ...w, lesson: l.number }); }));
+  const CARD_LV = [[1, "🥉", "Bronza"], [3, "🥈", "Kumush"], [6, "🥇", "Oltin"], [10, "💎", "Olmos"]];
+  const cardLv = n => CARD_LV.filter(x => (n || 0) >= x[0]).length;   // 0 — hali ochilmagan, 1..4
+  function cardHit(ar) {
+    if (!WORDS.has(ar)) return;
+    S.cards = S.cards || {};
+    const before = cardLv(S.cards[ar]);
+    S.cards[ar] = (S.cards[ar] || 0) + 1;
+    const after = cardLv(S.cards[ar]);
+    if (BETA() && after > before && after >= 2) toast(`🃏 ${ar} kartasi: ${CARD_LV[after - 1][1]} ${CARD_LV[after - 1][2]}!`);
+  }
+  const myWords = () => openLessons().flatMap(l => (l.words || []).map(w => w.ar)).filter((a, i, all) => all.indexOf(a) === i).map(a => WORDS.get(a));
+  function renderCardsBtn() {
+    const b = $("#w-cards"); b.hidden = !BETA(); if (!BETA()) return;
+    const ws = myWords(), got = ws.filter(w => cardLv((S.cards || {})[w.ar]) > 0).length, dia = ws.filter(w => cardLv((S.cards || {})[w.ar]) === 4).length;
+    b.innerHTML = `<span class="ci">🃏</span><span class="t"><b>So'z kartalari · ${got}/${ws.length}</b><small>🧪 sinov · 💎 ${dia} ta olmos karta</small></span><span style="font-size:22px">›</span>`;
+    b.onclick = cardsSheet;
+  }
+  function cardsSheet() {
+    const ws = myWords(), lv = w => cardLv((S.cards || {})[w.ar]);
+    const cnt = k => ws.filter(w => lv(w) === k).length;
+    const sorted = [...ws].sort((a, b) => lv(b) - lv(a) || ((S.cards || {})[b.ar] || 0) - ((S.cards || {})[a.ar] || 0));
+    sheet(`<h3>🃏 So'z kartalari</h3>
+      <p>Har bir so'zni to'g'ri topsangiz, karta kuchayadi: 🥉 1 · 🥈 3 · 🥇 6 · 💎 10 marta.</p>
+      <div class="card-lv"><span>💎 ${cnt(4)}</span><span>🥇 ${cnt(3)}</span><span>🥈 ${cnt(2)}</span><span>🥉 ${cnt(1)}</span><span>❔ ${cnt(0)}</span></div>
+      <button class="btn btn-brand btn-block" id="cards-go">💪 Zaif kartalarni kuchaytirish (10 savol)</button>
+      <div class="wcards">${sorted.map(w => { const k = lv(w), n = (S.cards || {})[w.ar] || 0;
+        return `<div class="wcard l${k}"><span class="ar">${esc(w.ar)}</span><small>${k ? esc(w.uz) : "hali ochilmagan"}</small><small>${k ? `${CARD_LV[k - 1][1]} ${n} marta` : "❔"}</small></div>`; }).join("")}</div>
+      <button class="btn btn-soft btn-block" data-close>Yopish</button>`);
+    $("#cards-go").onclick = () => { closeSheet(); startCards(); };
+  }
+  // Eng zaif (kam topilgan) so'zlardan savollar: ar→uz, uz→ar, tinglab topish
+  function cardQ(w) {
+    const d = lesson(w.lesson), pool = sameKind(w, d.words), t = pick(["ar2uz", "uz2ar", "l_word"]);
+    if (t === "ar2uz") return Q("ar2uz", "reading", w.ar, `<b>${w.ar}</b>\n\nBu so'z nima degani?`, options(w.uz, pool.map(x => x.uz)), { hint: `${w.ar}: ${w.uz}`, audio: w.ar });
+    if (t === "uz2ar") return Q("uz2ar", "reading", w.ar, `<b>«${cap(w.uz)}»</b> arabchada qanday bo'ladi?`, options(w.ar, pool.map(x => x.ar)));
+    return Q("l_word", "listening", w.ar, "🎧 Eshiting. Qaysi so'z aytildi?", options(w.ar, pool.map(x => x.ar)), { audio: w.ar, hint: `${w.ar}: ${w.uz}` });
+  }
+  function startCards() {
+    const ws = shuffle(myWords()).sort((a, b) => ((S.cards || {})[a.ar] || 0) - ((S.cards || {})[b.ar] || 0)).slice(0, 10);
+    startRun("cards", ws.map(cardQ));
+  }
+
+  function duelSheet() {
+    const inc = INBOX.incoming.map(d => `
+      <div class="duel-item">${avaHtml(d.ava, d.from)}
+        <span class="t"><b>${esc(d.from)}</b><small>sizni duelga chaqirdi</small></span>
+        <button class="btn btn-danger" data-decline="${d.id}" aria-label="Rad etish">✕</button>
+        <button class="btn btn-brand" data-play="${d.id}">O'ynash</button></div>`).join("");
+    const wait = INBOX.waiting.map(d => `
+      <div class="duel-item">${avaHtml(d.ava, d.vs)}
+        <span class="t"><b>${esc(d.vs)}</b><small>${d.played ? "siz o'ynadingiz, raqib kutilmoqda ⏳" : "hali o'ynamadingiz"}</small></span>
+        ${d.played ? "" : `<button class="btn btn-brand" data-play="${d.id}">O'ynash</button>`}</div>`).join("");
+    const res = INBOX.results.slice(0, 5).map(d => `
+      <div class="duel-item">${avaHtml(d.ava, d.vs)}
+        <span class="t"><b>${esc(d.vs)}</b><small>${d.my} : ${d.their}</small></span>
+        <span class="tag ${d.outcome}">${{ win: "🏆 G'alaba", lose: "Mag'lubiyat", draw: "🤝 Durang" }[d.outcome]}</span></div>`).join("");
+    sheet(`<h3>⚔️ Duel</h3>
+      <div id="duel-world">${worldDuelCard()}</div>
+      ${TROPHY_ON() ? `<div id="duel-arena">${TROPHIES ? arenaCard(TROPHIES.mine) : ""}</div>` : ""}
+      <p>${DUEL_QUESTIONS} ta savol, har biriga ${TIMER} soniya. Ikkalangizga bir xil savollar. Ko'p topgan yutadi, teng bo'lsa tezrog'i. G'olibga +30 XP.</p>
+      <button class="btn btn-brand btn-block" id="duel-new">➕ Yangi duel: raqib tanlash</button>
+      ${inc ? `<h3 style="font-size:15px;margin-top:6px">📨 Sizga takliflar</h3><div>${inc}</div>` : ""}
+      ${wait ? `<h3 style="font-size:15px;margin-top:6px">⏳ Siz chaqirganlar</h3><div>${wait}</div>` : ""}
+      ${res ? `<h3 style="font-size:15px;margin-top:6px">📜 So'nggi natijalar</h3><div>${res}</div>` : ""}
+      <button class="btn btn-soft btn-block" data-close>Yopish</button>`);
+    $("#duel-new").onclick = pickOpponent;
+    const bindWorld = () => { const w = $("#world-open"); if (w) w.onclick = openWorld; };
+    bindWorld();
+    loadWorldPos().then(() => { const box = $("#duel-world"); if (box) { box.innerHTML = worldDuelCard(); bindWorld(); } });
+    if (TROPHY_ON()) {
+      const bindArena = () => { const a = $("#arena-open"); if (a) a.onclick = trophySheet; };
+      bindArena();
+      loadTrophies().then(t => { const box = $("#duel-arena"); if (t && box) { box.innerHTML = arenaCard(t.mine); bindArena(); } });
+    }
+    $$("[data-play]").forEach(b => (b.onclick = () => playDuel(+b.dataset.play)));
+    $$("[data-decline]").forEach(b => (b.onclick = async () => {
+      try { await rpc("duel_decline", { p_token: TOKEN, p_id: +b.dataset.decline }); } catch { /* */ }
+      await loadInbox(); duelSheet();
+    }));
+  }
+
+  async function pickOpponent() {
+    let mates = [];
+    try { mates = await rpc("classmates", { p_token: TOKEN }); } catch (e) { return toast(errText(e)); }
+    if (!mates.length) return toast("Guruhda hali boshqa o'quvchi yo'q");
+    sheet(`<h3>⚔️ Kimni chaqiramiz?</h3>
+      <button class="btn btn-danger btn-block" data-opp="${esc(pick(mates).id)}">🎲 Tasodifiy raqib</button>
+      <div>${mates.map(m => `<div class="duel-item">${avaHtml(m.ava, m.name)}<span class="t"><b>${esc(m.name)}</b></span>
+        <button class="btn btn-soft" data-opp="${esc(m.id)}">Chaqirish</button></div>`).join("")}</div>
+      <button class="btn btn-soft btn-block" data-close>Bekor qilish</button>`);
+    $$("[data-opp]").forEach(b => (b.onclick = async () => {
+      const lessons = groupLessons().slice(-DUEL_LAST_LESSONS);
+      const qs = buildVaried(lessons, DUEL_QUESTIONS);
+      try {
+        const d = await rpc("duel_create", { p_token: TOKEN, p_opponent: b.dataset.opp, p_questions: qs });
+        closeSheet();
+        toast("📨 Taklif yuborildi! Endi siz o'ynaysiz");
+        startRun("duel", d.questions, { duelId: d.id });
+      } catch (e) { toast(e.message === "TOO_MANY_DUELS" ? "Javobsiz takliflaringiz ko'p. Avval ular tugasin." : errText(e)); }
+    }));
+  }
+
+  async function playDuel(id) {
+    try {
+      const qs = await rpc("duel_questions", { p_token: TOKEN, p_id: id });
+      closeSheet();
+      startRun("duel", qs, { duelId: id });
+    } catch (e) { toast(e.message === "DUEL_GONE" ? "Bu duel endi mavjud emas" : errText(e)); await loadInbox(); }
+  }
+
+  async function finishDuel(r) {
+    let res;
+    try { res = await rpc("duel_submit", { p_token: TOKEN, p_id: r.duelId, p_score: r.right, p_time: Math.round(r.timeUsed * 10) / 10 }); }
+    catch (e) { res = { status: "error", msg: errText(e) }; }
+    await saveResult(0, 0, "duel", r.answers);   // javoblar statistikasi va xatolar uchun
+    await loadInbox();
+    const chest = inboxChest; inboxChest = null;
+    if (!run || run !== r) return;
+    let head, pill = "";
+    if (res.status === "done") {
+      head = { win: "🎉 Siz yutdingiz!", lose: "😤 Bu safar yutqazdingiz. Revansh?", draw: "🤝 Durang! Kuchlar teng." }[res.outcome];
+      pill = `<span class="pill green">⭐ +${{ win: 30, draw: 15, lose: 5 }[res.outcome]} XP</span>`;
+      // 🌍 xaritadagi o'zgarish
+      const before = worldPos(); await loadWorldPos(); const after = worldPos();
+      try {
+        const W = await loadWorld();
+        if (after > before) { const c = W.c[after - 1]; pill += `<div class="new-badge">🌍 Yangi davlat: ${flag(c.k)} ${esc(c.n)}${c.a ? " ⭐" : ""}${after % 10 === 0 ? " · 🏰 qal'a!" : ""}</div>`; sfx("badge"); }
+        else if (after < before) { const c = W.c[before - 1]; pill += `<div class="new-badge lost">🌍 ${flag(c.k)} ${esc(c.n)} qo'ldan ketdi 😢 Revansh oling!</div>`; }
+        else if (res.outcome === "lose") pill += `<span class="pill soft">🏰 Qal'a sizni himoya qildi</span>`;
+      } catch { /* xaritasiz */ }
+      if (TROPHY_ON()) {
+        const before = TROPHIES ? TROPHIES.mine : null, d = TROPHY[res.outcome];
+        pill += `<span class="pill gold">🏆 ${d > 0 ? "+" : ""}${d}</span>` + chestPill(chest);
+        const t = await loadTrophies();
+        if (t && before != null && arenaIdx(t.mine) > arenaIdx(before)) {
+          const a = ARENAS[arenaIdx(t.mine)];
+          pill += `<div class="new-badge">🎉 Yangi davlat ochildi: ${a[1]} ${a[2]} ${a[3]}!</div>`;
+          sfx("badge");
+        }
+      }
+    } else if (res.status === "waiting") head = "Siz tugatdingiz! Raqib o'ynagach natija chiqadi ⏳";
+    else head = res.msg;
+    $("#quiz-in").innerHTML = `
+      <div class="result">
+        <div class="q-meta">⚔️ Duel</div>
+        <div class="score">${res.status === "done" ? `${res.my} : ${res.their}` : `${r.right}/${r.qs.length}`}</div>
+        <div style="font-family:var(--f-display);font-weight:600;font-size:17px;text-wrap:balance">${head}</div>
+        <div class="gain">${pill}</div>
+        <div class="actions"><button class="btn btn-brand btn-block" id="duel-again">⚔️ Duellar</button>
+          <button class="btn btn-soft btn-block" data-home>Bosh sahifa</button></div>
+      </div>`;
+    $("[data-home]").onclick = closeRun;
+    $("#duel-again").onclick = () => { closeRun(); duelSheet(); };
+  }
+
+  // ---------- Pastdan chiquvchi oyna ----------
+  function sheet(html) {
+    $("#sheet-root").innerHTML = `<div class="sheet-wrap" id="sw"><div class="sheet" role="dialog" aria-modal="true"><button class="sheet-x" data-close aria-label="Yopish">✕</button><div class="grab"></div>${html}</div></div>`;
+    $("#sw").addEventListener("click", e => { if (e.target.id === "sw" || e.target.closest("[data-close]")) closeSheet(); });
+    syncBack();
+  }
+  const closeSheet = () => { dropRecording(); $("#sheet-root").innerHTML = ""; syncBack(); };
+
+  // ---------- Telefonning «Orqaga» tugmasi ----------
+  // Oyna, test yoki xarita ochiq bo'lsa, «Orqaga» ilovadan chiqarib yubormaydi — eng ustki narsani yopadi (✕ bosilgandek).
+  // Buning uchun brauzer tarixiga bitta «qo'riqchi» yozuv qo'yiladi. U ✕ bilan yopilganda ham qoladi (tarixni dastur orqali
+  // ortga surish ishonchsiz), shuning uchun shundan keyin ilovadan chiqish uchun «Orqaga» ikki marta bosiladi.
+  let backGuard = false;
+  const overlayOpen = () => !!run || !!$("#sheet-root").innerHTML || !!$("#world") || !$("#fon").hidden;
+  function syncBack() {
+    if (!overlayOpen() || backGuard) return;
+    try { history.pushState({ tb: 1 }, ""); backGuard = true; } catch { /* tarix yopiq muhitda — «Orqaga» oddiy ishlayveradi */ }
+  }
+  window.addEventListener("popstate", e => {
+    if (e.state && e.state.tb) { backGuard = true; return; }   // «Oldinga» bosilib, qo'riqchi yozuvga qaytildi
+    backGuard = false;
+    if ($("#world")) $("#w-close").click();
+    else if ($("#sheet-root").innerHTML) closeSheet();
+    else if (!$("#fon").hidden) closeFon();
+    else if (run) { const q = $("[data-quit]"); if (q) q.click(); else closeRun(); }   // natija ekranida — bosh sahifaga
+    syncBack();
+  });
+
+  // ---------- Gapirish: ovoz yozib ustozga yuborish ----------
+  const REC_MAX = 90;   // soniya
+  let rec = null;       // { stream, mr, chunks, t0, timer, blob, url, mime, seconds }
+  function stopRecording() {
+    if (!rec) return;
+    clearInterval(rec.timer);
+    try { if (rec.mr && rec.mr.state !== "inactive") rec.mr.stop(); } catch { /* */ }
+    try { rec.stream && rec.stream.getTracks().forEach(t => t.stop()); } catch { /* */ }
+  }
+  function dropRecording() {
+    stopRecording();
+    if (rec && rec.url) URL.revokeObjectURL(rec.url);
+    rec = null;
+  }
+  const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  const seenSpeak = () => { try { return JSON.parse(store.get("dod_speak_seen") || "[]"); } catch { return []; } };
+
+  async function loadSpeakBadge() {
+    try {
+      const mine = await rpc("speaking_mine", { p_token: TOKEN });
+      const seen = new Set(seenSpeak());
+      const fresh = mine.filter(x => x.score && !seen.has(x.id)).length;
+      $("#speak-count").hidden = !fresh; $("#speak-count").textContent = fresh;
+      if (mine.filter(x => x.score).length >= 10 && !S.badges.includes("speak10")) S.badges.push("speak10");
+      return mine;
+    } catch { return null; }
+  }
+
+  function speakSheet(prev) {
+    dropRecording();
+    const topics = D.speaking.filter(t => teacherOpened(t.lesson));
+    const others = topics.filter(x => x.title !== prev);
+    const t = pick(others.length ? others : topics);
+    sheet(`<h3>🎤 Gapirish mashqi</h3>
+      <p>Mavzu: <b style="color:var(--ink)">${esc(t.title)}</b><br>${esc(t.task)}</p>
+      <div class="q-card"><div class="ar" style="font-size:22px;font-weight:700;line-height:1.9">${esc(t.example)}</div>
+        <button class="listen" id="sp-play" aria-label="Namunani tinglash">🔊</button></div>
+      <div class="rec" id="rec"></div>
+      <button class="btn btn-soft btn-block" id="sp-next">🔄 Boshqa mavzu</button>
+      <h3 style="font-size:15px;margin-top:4px">📝 Mening javoblarim</h3>
+      <div id="sp-mine" style="display:grid;gap:6px"><p class="muted">Yuklanmoqda…</p></div>
+      <button class="btn btn-soft btn-block" data-close>Yopish</button>`);
+    $("#sp-play").onclick = () => play(t.example);
+    $("#sp-next").onclick = () => speakSheet(t.title);
+    recStage("idle", t);
+    loadSpeakBadge().then(mine => {
+      const box = $("#sp-mine"); if (!box) return;
+      if (!mine) { box.innerHTML = `<p class="muted">${ERRORS.NET}</p>`; return; }
+      box.innerHTML = mine.length ? mine.map(x => `<div class="sp-item"><b>${esc(x.topic)}</b>
+        <small>${x.score ? `${"⭐".repeat(x.score)}${"☆".repeat(5 - x.score)} · +${x.score * 6} XP` : "⏳ Ustoz hali baholamagan"}</small>
+        ${x.comment ? `<span>💬 ${esc(x.comment)}</span>` : ""}</div>`).join("")
+        : `<p class="muted">Hali javob yubormadingiz. Birinchisini yozing! 🎙</p>`;
+      const graded = mine.filter(x => x.score).map(x => x.id);
+      store.set("dod_speak_seen", JSON.stringify([...new Set([...seenSpeak(), ...graded])].slice(-100)));
+      $("#speak-count").hidden = true;
+    });
+  }
+
+  function recStage(stage, t) {
+    const box = $("#rec"); if (!box) return;
+    if (stage === "idle") {
+      box.innerHTML = `<button class="rec-btn" id="rec-start" aria-label="Yozishni boshlash">🎙</button>
+        <small class="muted">Bosing va arabcha gapiring (${REC_MAX} soniyagacha)</small>`;
+      $("#rec-start").onclick = () => startRecording(t);
+    } else if (stage === "recording") {
+      box.innerHTML = `<div class="rec-time"><span class="rec-live"></span><span id="rec-sec">0:00</span></div>
+        <button class="rec-btn stop" id="rec-stop" aria-label="To'xtatish">⏹</button><small class="muted">Tugatgach to'xtatish tugmasini bosing</small>`;
+      $("#rec-stop").onclick = () => stopRecording();
+    } else if (stage === "done") {
+      box.innerHTML = `<small class="muted">Yozganingizni eshitib ko'ring (${fmt(rec.seconds)})</small><audio controls src="${rec.url}"></audio>
+        <div class="rec-actions"><button class="btn btn-soft" id="rec-again">🔄 Qayta yozish</button><button class="btn btn-brand" id="rec-send">📤 Yuborish</button></div>`;
+      $("#rec-again").onclick = () => { dropRecording(); recStage("idle", t); };
+      $("#rec-send").onclick = () => sendRecording(t);
+    } else if (stage === "sent") {
+      box.innerHTML = `<div style="font-size:34px">✅</div><b>Ustozga yuborildi!</b><small class="muted">Baho va izoh shu yerda, «Mening javoblarim»da ko'rinadi</small>`;
+    }
+  }
+
+  async function startRecording(t) {
+    if (!navigator.mediaDevices || !window.MediaRecorder) {
+      return toast(inTelegram ? "Telegram ichida ovoz yozib bo'lmaydi. Ilovani Chrome yoki Safari'da oching" : "Bu brauzerda ovoz yozib bo'lmaydi. Chrome yoki Safari'da oching");
+    }
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch { return toast("🎙 Mikrofonga ruxsat bering: brauzer so'raganda «Разрешить» ni bosing"); }
+    const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"].find(m => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || "";
+    let mr;
+    try { mr = new MediaRecorder(stream, mime ? { mimeType: mime, audioBitsPerSecond: 32000 } : undefined); }
+    catch { mr = new MediaRecorder(stream); }
+    rec = { stream, mr, chunks: [], t0: Date.now(), mime: mr.mimeType || mime || "audio/webm" };
+    mr.ondataavailable = e => { if (e.data && e.data.size) rec.chunks.push(e.data); };
+    mr.onstop = () => {
+      if (!rec) return;
+      rec.seconds = (Date.now() - rec.t0) / 1000;
+      rec.blob = new Blob(rec.chunks, { type: rec.mime });
+      rec.url = URL.createObjectURL(rec.blob);
+      try { rec.stream.getTracks().forEach(tr => tr.stop()); } catch { /* */ }
+      if (rec.seconds < 2) { dropRecording(); recStage("idle", t); return toast("Juda qisqa. Kamida bir necha soniya gapiring"); }
+      recStage("done", t);
+    };
+    mr.start(1000);
+    recStage("recording", t);
+    rec.timer = setInterval(() => {
+      const s = (Date.now() - rec.t0) / 1000;
+      const el = $("#rec-sec"); if (el) el.textContent = fmt(s);
+      if (s >= REC_MAX) stopRecording();
+    }, 250);
+  }
+
+  async function sendRecording(t) {
+    if (!rec || !rec.blob) return;
+    $("#rec-send").disabled = true; $("#rec-send").textContent = "Yuborilmoqda…";
+    const b64 = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(",")[1] || ""); fr.readAsDataURL(rec.blob); });
+    try {
+      await rpc("speaking_submit", { p_token: TOKEN, p_topic: t.title, p_mime: rec.mime.slice(0, 60), p_audio_b64: b64, p_seconds: Math.round(rec.seconds) });
+      dropRecording();
+      recStage("sent", t);
+      if (t.onSent) t.onSent();
+    } catch (e) {
+      $("#rec-send").disabled = false; $("#rec-send").textContent = "📤 Yuborish";
+      toast({ SPEAK_LIMIT: "Bugun 3 ta javob yubordingiz. Ertaga davom etamiz! 💪", AUDIO_TOO_BIG: "Yozuv juda uzun. Qisqaroq qilib qayta yozing" }[e.message] || errText(e));
+    }
+  }
+
+  // ---------- Ekranlar ----------
+  function render() {
+    if (!ME) return;
+    const st = streakNow();
+    $("#h-name").textContent = ME.name;
+    $("#h-streak").textContent = st; $("#chip-fire").classList.toggle("off", !st);
+    $("#h-xp").textContent = ME.xp;
+
+    const doneToday = S.missionDay === today();
+    $("#m-title").textContent = doneToday ? "Bajarildi ✅" : "5 ta savol";
+    const fonDoneToday = S.fonMission === today();
+    $("#mf-title").textContent = fonDoneToday ? "Bajarildi ✅" : "12 ta savol";
+    $("#mf-start").textContent = fonDoneToday ? "Mashq →" : "Boshlash →";
+    $("#m-sub").textContent = doneToday ? "Ertaga yana keling. Hozir qo'shimcha mashq qilsangiz ham bo'ladi."
+      : st ? `Bajarsangiz, olov ${st + 1}-kunga yonadi. Tez javob uchun ⚡ bonus.` : "Bajaring va olovni yoqing 🔥 Tez javob uchun ⚡ bonus.";
+    $("#m-start").textContent = doneToday ? "Mashq →" : "Boshlash →";
+    $$("#m-dots i").forEach(i => i.classList.toggle("on", doneToday));
+
+    const next = RANKS.find(r => r[0] > ME.xp), cur = RANKS.filter(r => ME.xp >= r[0]).pop();
+    const todayXp = Math.min(DAILY_CAP, ME.practice_today || 0);
+    // Unvon — Profilda, bugungi XP — missiya kartasida (tozalangan bosh sahifa)
+    $("#rankline").innerHTML = next
+      ? `<div class="l"><b>${cur[1]}</b><span>${next[0] - ME.xp} XP → ${next[1]}</span></div><div class="bar"><i style="width:${Math.round((ME.xp - cur[0]) * 100 / (next[0] - cur[0]))}%"></i></div>`
+      : `<div class="l"><b>${cur[1]}</b><span>Eng yuqori unvon 👑</span></div><div class="bar"><i style="width:100%"></i></div>`;
+    $("#m-xp").innerHTML = `<div class="l"><span>Bugungi XP</span><b>${todayXp} / ${DAILY_CAP}</b></div><div class="bar"><i style="width:${Math.round(todayXp * 100 / DAILY_CAP)}%"></i></div>`;
+    const tdTab = $('.tab[data-tab="today"]'); if (tdTab) tdTab.hidden = !DAILY_ON;   // «Bugun» bo'sh paytda menyuda ko'rinmaydi
+
+    const mc = Object.keys(S.mistakes).length;
+    $("#mist-count").hidden = !mc; $("#mist-count").textContent = mc;
+
+    renderWotd(); renderLessons(); renderWords(); renderProfile(); renderToday(); renderChests(); renderCardsBtn(); renderWorldCard(); renderFon();
+  }
+  const showTab = name => $(`.tab[data-tab="${name}"]`).click();
+
+  // Kun so'zi: har kuni hamma uchun bitta so'z (sana bo'yicha tanlanadi)
+  function seeded(seed) { let x = 0; for (const ch of seed) x = (x * 31 + ch.charCodeAt(0)) >>> 0; return () => ((x = (x * 1103515245 + 12345) >>> 0) / 4294967296); }
+  function renderWotd() {
+    const words = groupLessons().flatMap(l => l.words);
+    const r = seeded(today());
+    const w = words[Math.floor(r() * words.length)];
+    if (!w) { $("#wotd").innerHTML = ""; $("#wotd-note").textContent = ""; return; }   // guruhda hali ochiq dars yo'q
+    const pool =[...new Set(sameKind(w, words).map(x => x.uz).filter(u => u !== w.uz))];
+    const others = []; while (others.length < 3 && pool.length) others.push(pool.splice(Math.floor(r() * pool.length), 1)[0]);
+    const opts = [...others, w.uz].sort(() => r() - .5);
+    const done = S.wotd.day === today();
+    $("#wotd-note").textContent = done ? (S.wotd.ok ? "✅ Topdingiz" : "Ertaga yangi so'z") : `+${XP_WOTD} XP`;
+    $("#wotd").innerHTML = `
+      <div class="wotd-head"><span class="q-meta">${done ? "Bugungi so'z" : "Ma'nosini bilasizmi?"}</span><button class="listen" id="wotd-play" aria-label="Tinglash">🔊</button></div>
+      <div class="wotd-word ar">${esc(w.ar)}</div>
+      ${done ? `<p style="text-align:center;margin:0;font-weight:700">${esc(cap(w.uz))}</p>`
+        : `<div class="grid2">${opts.map(o => `<button class="opt-sm" data-o="${esc(o)}">${esc(o)}</button>`).join("")}</div>`}`;
+    $("#wotd-play").onclick = () => play(w.ar);
+    $$("#wotd .opt-sm").forEach(b => (b.onclick = async () => {
+      const ok = b.dataset.o === w.uz;
+      $$("#wotd .opt-sm").forEach(x => { x.disabled = true; if (x.dataset.o === w.uz) x.classList.add("good"); else if (x === b) x.classList.add("bad"); });
+      S.wotd = { day: today(), ok };
+      if (ok) bump("wotd_ok");
+      const fresh = checkBadges();
+      await saveResult(0, ok ? XP_WOTD : 0, "wotd", [{ s: "reading", t: w.ar, c: ok }]);
+      toast(ok ? `✅ To'g'ri! ${w.ar} = ${w.uz} · +${XP_WOTD} XP` : `❌ ${w.ar} = ${w.uz}. Ertaga albatta topasiz!`);
+      if (fresh.length) setTimeout(() => toast(`🏅 Yangi nishon: ${fresh[0][1]} ${fresh[0][2]}`), 3100);
+      setTimeout(render, 1400);
+    }));
+  }
+
+  // Darajalar xaritasi: hozircha faqat Pre-A1 tayyor, qolganlari "Tez orada"
+  const LEVELS = [
+    // Nomlar kitobdagidek arabcha (المنهج العالمي darajalari)
+    ["Pre-A1", "التَّمْهِيدِيُّ", "Alifbo va ilk so'zlar"],
+    ["A1", "الْمُبْتَدِئُ الْأَوَّلُ", "Oddiy suhbat, kundalik so'zlar"],
+    ["A2", "الْمُبْتَدِئُ الثَّانِي", "O'zim, oilam, shahrim haqida"],
+    ["B1", "الْمُتَوَسِّطُ الْأَوَّلُ", "اَلتَّعْبِيرُ عَنِ الرَّأْيِ"],
+    ["B2", "الْمُتَوَسِّطُ الثَّانِي", "اَلنِّقَاشُ وَقِرَاءَةُ الْمَقَالَاتِ"],
+    ["C1", "الْمُتَقَدِّمُ الْأَوَّلُ", "اَلطَّلَاقَةُ فِي الْكَلَامِ"],
+    ["C2", "الْمُتَقَدِّمُ الثَّانِي", "مُسْتَوَى الْإِتْقَانِ"],
+  ];
+  // Xarita: daraja nishoni → darslar doirachalari (ilon izi) → imtihon → keyingi daraja
+  function renderLessons() {
+    const WAVE = [50, 68, 78, 68, 50, 32, 22, 32];
+    const levelLessons = code => D.lessons.filter(l => (l.level || "Pre-A1") === code);
+    const items = []; let y = 60, w = 0;
+    LEVELS.forEach(([code, name, sub], li) => {
+      const ls = levelLessons(code), ready = ls.length > 0;
+      const done = ls.filter(l => passed(l.number)).length;
+      if (li) y += 40;
+      const here = ls.some(l => isOpen(l.number) || passed(l.number));   // talaba shu darajaga yetib kelganmi
+      items.push({ kind: "level", li, code, name, sub, ready, here, done, total: ls.length, x: 50, y }); y += ready ? 205 : 150;
+      if (!ready) return;
+      ls.forEach(l => { items.push({ kind: "lesson", n: l.number, title: l.title, x: WAVE[w++ % WAVE.length], y }); y += 96; });
+      if (li === 0) { items.push({ kind: "exam", x: 50, y: y + 6 }); y += 120; }
+    });
+    const h = y;
+    // Yo'l chizig'i: o'tilgan qismi oltin rangda yonadi
+    const lit = it => it.kind === "lesson" ? passed(it.n) : it.kind === "level" ? it.ready : false;
+    const seg = (a, b) => `<path vector-effect="non-scaling-stroke" class="${lit(a) && (lit(b) || b.kind === "lesson" && isOpen(b.n)) ? "done" : ""}" d="M${a.x} ${a.y} C${a.x} ${(a.y + b.y) / 2} ${b.x} ${(a.y + b.y) / 2} ${b.x} ${b.y}"/>`;
+    const node = it => {
+      const pos = `style="left:${it.x}%;top:${it.y}px"`;
+      if (it.kind === "level") {
+        const done = it.ready && it.done === it.total, cls = done ? "done" : it.ready && it.here ? "current" : "soon";
+        return `<button class="lv ${cls}" data-lv="${it.li}" ${pos}>
+          <span class="lv-node" style="--p:${it.ready ? Math.round(it.done * 100 / it.total) : 0}">${done ? "✓" : it.code}</span>
+          <span class="lv-label"><b class="ar">${it.name}</b><small class="s">${it.code} · ${it.ready ? `${it.done}/${it.total} ${it.li ? "bo'lim" : "dars"}` : "🔒 Tez orada"}</small></span></button>`;
+      }
+      if (it.kind === "exam") {
+        const cls = (S.examBest || 0) >= PASS ? "done" : ME.group.exam_open ? "open" : "locked";
+        return `<button class="ln exam ${cls}" data-exam ${pos} aria-label="CEFR sinov imtihoni"><span class="ln-dot">🎓</span><span class="ln-lab">Imtihon${S.examBest ? ` · ${S.examBest}%` : ""}</span></button>`;
+      }
+      const n = it.n, cls = passed(n) ? "done" : isOpen(n) ? "current" : "locked";
+      const side = it.x > 50 ? "left" : "right";
+      return `<button class="ln ${cls}" data-n="${n}" ${pos} aria-label="${lname(n)}">
+        ${cls === "current" ? `<span class="lv-here">Boshlash</span>` : ""}
+        <span class="ln-dot">${cls === "done" ? "✓" : n > 100 ? n - 100 : n}</span><span class="ln-lab ${side} ar ${n > 100 ? "long" : ""}">${esc(it.title)}</span></button>`;
+    };
+    // 🗺 Manzara: har daraja o'z hududida (fon + chetlardagi bezaklar). Bezaklar faqat chetlarda — doirachalarga tegmaydi
+    const ZONES = { "Pre-A1": ["oasis", "🌴 Alifbo vohasi", ["🌴", "🐪", "⛺", "🏺", "🌙", "✨", "🌵", "⭐"]],
+      "A1": ["city", "🏙️ Shahar", ["🏙️", "🚕", "☕", "🏪", "📚", "🚌", "🌇", "🛍️"]] };
+    const lvItems = items.filter(x => x.kind === "level");
+    const zones = lvItems.map((lv, i) => {
+      const end = i + 1 < lvItems.length ? lvItems[i + 1].y - 40 : h;
+      const [cls, title, deco] = ZONES[lv.code] || ["fog", "☁️ Tez orada", ["☁️", "🏔️", "☁️", "🌫️"]];
+      const ds = [];
+      for (let y = lv.y + 150, k = 0; y < end - 40; y += 118, k++)
+        ds.push(`<span class="mz-deco" style="left:${k % 2 ? 91 : 9}%;top:${y + (k % 3) * 14}px">${deco[k % deco.length]}</span>`);
+      return `<div class="mz mz-${cls}" style="top:${lv.y - 70}px;height:${end - lv.y + 70}px"><span class="mz-title">${title}</span></div>${ds.join("")}`;
+    }).join("");
+    const box = $("#lvmap");
+    box.style.height = h + "px";
+    box.innerHTML = zones + `<svg viewBox="0 0 100 ${h}" preserveAspectRatio="none" aria-hidden="true">${items.slice(1).map((b, i) => seg(items[i], b)).join("")}</svg>`
+      + items.map(node).join("");
+    $$(".lv").forEach(b => (b.onclick = () => {
+      const it = items.find(x => x.kind === "level" && x.li === +b.dataset.lv);
+      toast(!it.ready ? `🔒 ${it.code} darajasi tez orada ochiladi` : it.here ? `${it.code}: ${it.done}/${it.total} o'tildi` : `🔒 ${it.code} oldingi daraja tugagach ochiladi`);
+    }));
+    $$(".ln[data-n]").forEach(b => (b.onclick = () => lessonSheet(+b.dataset.n)));
+    $("[data-exam]").onclick = startExam;
+  }
+  // ---------- 📅 Bugun: kunlik topshiriqlar jadvali ----------
+  // Jadval o'quvchi «Bugun»ni birinchi ochgan kundan boshlanadi (S.dstart); yakshanba — dam olish.
+  // Topshiriq faqat o'sha kuni ball beradi; o'tgan kunlarnikini Practice box'da ballsiz ishlash mumkin.
+  const dow = d => new Date(d + "T00:00:00Z").getUTCDay();   // 0 — yakshanba
+  const WEEK = ["Ya", "Du", "Se", "Ch", "Pa", "Ju", "Sh"];
+  const unitName = n => `A1 ${n - 100}-unit`;
+  function taskFor(date) {
+    if (!S.dstart || date < S.dstart) return { none: true };
+    if (dow(date) === 0) return { rest: true };
+    let i = 0;
+    for (let d = S.dstart; d < date; d = addDays(d, 1)) if (dow(d) !== 0) i++;
+    for (const u of D.lessons.filter(l => l.level === "A1")) {
+      if (!u.days) return { soon: true, n: u.number };
+      if (i < u.days.length) return teacherOpened(u.number) ? { n: u.number, k: i } : { locked: true, n: u.number };
+      i -= u.days.length;
+    }
+    return { soon: true };
+  }
+  // Shu unit kuniga qaysi sana to'g'ri keladi (yo'q bo'lsa null)
+  function dateOf(n, k) {
+    if (!S.dstart) return null;
+    for (let d = S.dstart, t = 0; t < 400; d = addDays(d, 1), t++) {
+      const x = taskFor(d);
+      if (x.n === n && x.k === k) return d;
+      if (x.soon || (x.n && x.n > n)) return null;
+    }
+    return null;
+  }
+  const fmtDate = d => { const [, m, dd] = d.split("-"); return `${+dd}.${m}`; };
+  const dayDoneOnTime = date => PARTS.filter(([p]) => (onTime(date, p) || 0) >= PASS).length;
+
+  function startDaily(n, k, p, date) {
+    const live = !!date && date === today();
+    startRun("daily", PART_BUILD[p](dayData(n, k)), { lesson: n, day: k, part: p, date: live ? date : null, noXp: !live,
+      intro: p === "listening", hadIntro: p === "listening",
+      title: `${unitName(n)} · ${k + 1}-kun · ${partLabel(p)}${live ? "" : " (mashq)"}` });
+  }
+
+  // ---------- 📅 Kunlik dars (2026-10-17, ustoz tasdiqlagan): hamma darajalar uchun, tayyor darslardan ----------
+  // Har o'quvchining bugungi darsi — o'zi turgan navbatdagi dars (ustoz ochgan, hali o'tilmagan). Bitta dars = 3 kun.
+  // Har kuni 4 qism: lug'at · grammatika · tinglash · o'qish. Hammasi 80%+ — olov yonadi (+20 XP). Yakshanba — dam olish.
+  // Hamma darslar o'tilgan bo'lsa — eski darslar navbat bilan takrorlanadi.
+  const KD = [["vocab", "📚", "Lug'at"], ["grammar", "✏️", "Grammatika"], ["listening", "🎧", "Tinglash"], ["reading", "📖", "O'qish"]];
+  const KD_DAYS = 3;
+  let todaySel = null;   // eski kod bilan moslik uchun
+  const kdProg = n => ((S.dprog || {})[n] || 0);
+  function kdLesson() {
+    const open = ORDER.filter(n => isOpen(n));
+    const cur = open.find(n => !passed(n) && kdProg(n) < KD_DAYS);
+    if (cur != null) return cur;
+    return open.length ? open.reduce((a, b) => (kdProg(b) < kdProg(a) ? b : a)) : null;
+  }
+  function kdToday() {
+    const t = (S.daily || {})[today()];
+    if (t && t.kd) return t;
+    const n = kdLesson(); if (n == null) return null;
+    return { kd: 1, n, k: kdProg(n) % KD_DAYS, parts: {} };
+  }
+  function kdQs(n, k, p) {
+    const L = lesson(n), a1 = n > 100, part = { ...L, words: share(L.words, k, KD_DAYS) };
+    const src = { vocab: [{ ...part, letters: null, phrases: null, shown: null, fills: null, dialogs: null }, ["reading"], 8],
+      grammar: [part, ["grammar"], 6], listening: [part, ["listening"], 6], reading: [{ ...L, words: [] }, ["reading"], 6] }[p];
+    let qs = build([src[0]], src[2], src[1], a1);
+    if (qs.length < 4) qs = build([L], src[2], src[1], a1);   // kun bo'lagi kichik bo'lsa — butun darsdan
+    return qs;
+  }
+  function startKD(p) {
+    const t = kdToday(); if (!t) return toast("📅 Ustoz hali dars ochmagan");
+    S.daily = S.daily || {}; S.daily[today()] = t;
+    const name = KD.find(x => x[0] === p);
+    startRun("daily", kdQs(t.n, t.k, p), { kd: true, lesson: t.n, day: t.k, part: p, date: today(), title: `📅 ${lname(t.n)} · ${t.k + 1}-kun · ${name[2]}` });
+  }
+  function renderToday() {
+    const box = $("#today-box"); if (!box || !ME) return;
+    const td = today(), mon = addDays(td, -((dow(td) + 6) % 7)), week = Array.from({ length: 7 }, (_, i) => addDays(mon, i));
+    const lit = d => !!(((S.daily || {})[d] || {}).bonus);
+    const weekHtml = `<div class="week">${week.map(d => `<div class="wd ${dow(d) === 0 ? "rest" : lit(d) ? "done" : d === td ? "todo" : d < td ? "missed" : "future"} ${d === td ? "today sel" : ""}">
+      <small>${WEEK[dow(d)]}</small><span>${dow(d) === 0 ? "😌" : lit(d) ? "🔥" : +d.slice(8)}</span></div>`).join("")}</div>`;
+    if (dow(td) === 0) { box.innerHTML = weekHtml + `<div class="card"><h3 style="margin:0 0 6px">😌 Bugun dam olish kuni</h3><p style="margin:0" class="muted">Yakshanba kunlik dars yo'q, olovingiz o'chmaydi. Ertaga davom etamiz!</p></div>`; return; }
+    const t = kdToday();
+    if (!t) { box.innerHTML = weekHtml + `<div class="card"><p style="margin:0">📅 Ustoz dars ochgach, kunlik dars shu yerda chiqadi.</p></div>`; return; }
+    const parts = t.parts || {}, got = KD.filter(([p]) => (parts[p] || 0) >= PASS).length, L = lesson(t.n);
+    box.innerHTML = weekHtml + `
+      <div class="t-head"><div><small>${lname(t.n)} · ${t.k + 1}/${KD_DAYS}-kun</small><b>${esc(D.lessonTitles[t.n] || "")}</b></div><span class="ar">${esc(L.title)}</span></div>
+      <div class="t-sum"><div><b>${t.bonus ? "🎉 Bugungi dars bajarildi!" : "Bugungi dars"}</b><span>${got}/${KD.length}</span></div><div class="bar"><i style="width:${got * 100 / KD.length}%"></i></div></div>
+      <div class="tcard">${KD.map(([p, ic, name]) => { const sc = parts[p], ok = (sc || 0) >= PASS;
+        return `<button class="trow sub ${ok ? "done" : ""}" data-tp="${p}"><span class="t-ic">${ok ? "✓" : ic}</span>
+          <span class="t-main"><b>${name}</b><span class="bar"><i style="width:${Math.min(100, sc || 0)}%"></i></span></span><span class="t-pct">${sc || 0}%</span></button>`; }).join("")}</div>
+      <p class="muted t-note">${t.bonus ? "Olovingiz bugun yondi 🔥 Xohlasangiz, qismlarni qayta ishlab mashq qiling." : `To'rttala qismdan ${PASS}% oling — olov yonadi 🔥 va +${XP_MISSION} XP bonus. Yakshanba — dam olish.`}</p>`;
+    $$(".trow[data-tp]").forEach(b => (b.onclick = () => startKD(b.dataset.tp)));
+  }
+
+  // 🧺 Practice box: jadvalda o'tib ketgan (yoki bugungi) kunlar ro'yxati
+  function practiceSheet() {
+    const td = today(), items = [];
+    for (let d = S.dstart; d && d <= td; d = addDays(d, 1)) { const t = taskFor(d); if (t.n && !t.locked) items.push({ d, ...t }); }
+    sheet(`<h3>🧺 Practice box</h3><p>O'tgan kunlarning mashqlari. Bu yerda ball berilmaydi, lekin bilim mustahkamlanadi 💪</p>
+      <div class="parts">${items.length ? items.reverse().map(x => `<button class="part" data-pd="${x.n}:${x.k}">
+        <span class="part-ic">${dayDone(x.n, x.k) === PARTS.length ? "✓" : x.k + 1}</span><span class="t"><b>${unitName(x.n)} · ${x.k + 1}-kun</b>
+        <small>${esc(lesson(x.n).days[x.k].title_uz)} · ${fmtDate(x.d)} · ${dayDone(x.n, x.k)}/${PARTS.length}</small></span><span class="go">›</span></button>`).join("")
+        : `<p class="muted">Hali o'tgan kunlar yo'q.</p>`}</div>
+      <button class="btn btn-soft btn-block" data-close>Yopish</button>`);
+    $$("[data-pd]").forEach(b => (b.onclick = () => { const [n, k] = b.dataset.pd.split(":").map(Number); daySheet(n, k); }));
+  }
+  // Bir kunning 5 qismi (mashq rejimi, ballsiz)
+  function daySheet(n, k) {
+    const day = lesson(n).days[k];
+    sheet(`<h3>${unitName(n)} · ${k + 1}-kun</h3><p>${esc(day.title_uz)} · 🧺 mashq (ballsiz)</p>
+      <div class="parts">${PARTS.map(([p, ic, name]) => {
+        const sc = dayScore(n, k, p), ok = (sc || 0) >= PASS;
+        return `<button class="part ${ok ? "done" : ""}" data-part="${p}"><span class="part-ic">${ok ? "✓" : ic}</span>
+          <span class="t"><b>${name}</b><small>${sc != null ? `eng yaxshi: ${sc}%` : "hali ishlanmagan"}</small></span><span class="go">›</span></button>`;
+      }).join("")}</div>
+      <button class="btn btn-soft btn-block" data-close>Yopish</button>`);
+    $$("[data-part]").forEach(b => (b.onclick = () => { closeSheet(); startDaily(n, k, b.dataset.part, null); }));
+  }
+  // Xaritadan unit bosilganda: kunlari ro'yxati
+  function unitSheet(n) {
+    if (!S.dstart) { closeSheet(); showTab("today"); return toast("📅 Avval kunlik dasturni boshlang"); }
+    const u = lesson(n), td = today();
+    sheet(`<h3>${unitName(n)} · <span class="ar">${esc(u.title)}</span></h3><p>${esc(D.lessonTitles[n])} · ${u.days.length} kun</p>
+      <div class="parts">${u.days.map((day, k) => {
+        const d = dateOf(n, k), st = !d ? "🔒 jadvalda keyinroq" : d > td ? `🔒 ${fmtDate(d)} kuni ochiladi` : d === td ? "📅 Bugungi topshiriq" : `${fmtDate(d)} · ${dayDone(n, k)}/${PARTS.length}`;
+        return `<button class="part ${dayDone(n, k) === PARTS.length ? "done" : d === td ? "next" : ""}" data-uk="${k}" data-d="${d || ""}">
+          <span class="part-ic">${dayDone(n, k) === PARTS.length ? "✓" : k + 1}</span><span class="t"><b>${k + 1}-kun: ${esc(day.title_uz)}</b><small>${st}</small></span><span class="go">›</span></button>`;
+      }).join("")}</div>
+      <p class="muted" style="font-size:13px">Unit har kuni «📅 Bugun» bo'limida beriladi. O'tgan kunlarni shu yerdan ballsiz takrorlash mumkin.</p>
+      <button class="btn btn-soft btn-block" data-close>Yopish</button>`);
+    $$("[data-uk]").forEach(b => (b.onclick = () => {
+      const d = b.dataset.d, k = +b.dataset.uk;
+      if (!d || d > td) return toast("🔒 Bu kun hali kelmadi");
+      if (d === td) { closeSheet(); todaySel = td; showTab("today"); return; }
+      daySheet(n, k);
+    }));
+  }
+
+  function lessonSheet(n) {
+    if (!isOpen(n)) return startLesson(n);   // yopiq bo'lsa sababini aytadi
+    if (hasParts(n)) return unitSheet(n);
+    const best = S.lessons[n] || 0;
+    sheet(`<h3>${lname(n)} · <span class="ar">${esc(lesson(n).title)}</span></h3>
+      <p>${esc(D.lessonTitles[n])}</p>
+      <p>${passed(n) ? `✅ O'tilgan · eng yaxshi natija: <b>${best}%</b>` : best ? `Eng yaxshi natija: ${best}%. O'tish uchun ${PASS}% kerak` : `${n > 100 ? 15 : 10} ta savol. O'tish uchun ${PASS}% kerak`}</p>
+      <button class="btn btn-brand btn-block" id="ls-go">${passed(n) ? "Qayta ishlash" : "Boshlash"} →</button>
+      <button class="btn btn-soft btn-block" data-close>Yopish</button>`);
+    $("#ls-go").onclick = () => { closeSheet(); startLesson(n); };
+  }
+
+  let wordLesson = 1, hideMeaning = false;
+  function renderWords() {
+    const open = groupLessons().map(l => l.number);
+    if (!open.includes(wordLesson)) wordLesson = open[open.length - 1];
+    $("#w-seg").innerHTML = D.lessons.map(l => `<button aria-pressed="${l.number === wordLesson}" data-wl="${l.number}" ${open.includes(l.number) ? "" : "disabled"}>${l.number > 100 ? `A1·${l.number - 100}` : l.number}. <span class="ar">${esc(l.title)}</span></button>`).join("");
+    const l = lesson(wordLesson);
+    if (!l) return;   // guruhda hali ochiq dars yo'q
+    $("#w-count").textContent = `${l.words.length} ta so'z`;
+    $("#w-hide").textContent = hideMeaning ? "👀 Ma'nosini ko'rsatish" : "🙈 Ma'nosini yashirish";
+    $("#w-list").innerHTML = l.words.map((w, i) => `<button class="word ${hideMeaning ? "hide" : ""}" data-wi="${i}"><span class="ar">${esc(w.ar)}</span><small>${esc(w.uz)}</small></button>`).join("");
+    const phr = [...(l.dialogs || []).map(d => ({ ar: d.say, uz: "↪ " + d.reply, audio: d.say })), ...(l.phrases || []).map(p => ({ ar: p.ar, uz: p.uz }))];
+    $("#w-phrases").innerHTML = phr.map((p, i) => `<button class="phrase" data-pi="${i}"><span class="t"><span class="ar">${esc(p.ar)}</span><small class="${isAr(p.uz) ? "ar" : ""}">${esc(p.uz)}</small></span>${p.audio ? `<span class="listen" aria-hidden="true">🔊</span>` : ""}</button>`).join("");
+    $$("#w-seg button").forEach(b => (b.onclick = () => { wordLesson = +b.dataset.wl; renderWords(); }));
+    $$("#w-list .word").forEach(b => (b.onclick = () => { play(l.words[+b.dataset.wi].ar); b.classList.remove("hide"); }));
+    $$("#w-phrases .phrase").forEach(b => (b.onclick = () => { const p = phr[+b.dataset.pi]; if (p.audio) play(p.audio); }));
+  }
+
+  // ---------- 🧑‍🎨 Avatar: multfilm qahramoni (DiceBear Avataaars, bepul) ----------
+  // Sozlamalari S.avatar da (bazada saqlanadi); reyting/duel ro'yxatlarida server 'ava' qilib qaytaradi
+  const AV = window.DodAvatar;
+  const avaCache = new Map();
+  function avaSvg(cfg) {
+    if (!AV || !cfg) return "";
+    const k = JSON.stringify(cfg);
+    if (!avaCache.has(k)) { try { avaCache.set(k, AV.svg(cfg)); } catch { avaCache.set(k, ""); } }
+    return avaCache.get(k);
+  }
+  const avaHtml = (cfg, name, cls = "ava") => {
+    const s = avaSvg(cfg);
+    return s ? `<span class="${cls} has-img">${s}</span>` : `<span class="${cls}">${esc((name || "?")[0].toUpperCase())}</span>`;
+  };
+  const AV_TABS = [["h", "Soch / ro'mol"], ["hc", "Soch rangi"], ["hat", "Bosh kiyim"], ["hj", "Ro'mol / shapka rangi"], ["bd", "Soqol"], ["s", "Yuz rangi"], ["e", "Ko'z"], ["b", "Qosh"],
+    ["m", "Og'iz"], ["g", "Ko'zoynak"], ["er", "Sirg'a"], ["f", "Belgi"], ["bg", "Fon"]];
+  const AV_COLORS = new Set(["s", "hc", "hj", "bg"]);
+  function avatarEditor() {
+    if (!AV) return toast("Avatar yuklanmadi. Sahifani yangilang");
+    let draft = AV.clean(S.avatar || AV.random()), tab = "h";
+    const hj = () => draft.h === "hijab";
+    const tabs = () => AV_TABS.filter(([k]) => k === "hj" ? hj() || ["cap", "beanie"].includes(draft.hat) : !(hj() && ["hc", "er", "hat", "bd"].includes(k)));
+    const draw = () => {
+      $("#av-prev").innerHTML = avaSvg(draft);
+      if (!tabs().some(([k]) => k === tab)) tab = "h";
+      $("#av-tabs").innerHTML = tabs().map(([k, n]) => `<button data-avt="${k}" aria-pressed="${k === tab}">${n}</button>`).join("");
+      // 🧪 Noyob buyumlar (sandiqdan): sinov rejimida ko'rinadi, ochilmaganlari qulflangan
+      const extra = BETA() ? (AV.EXTRA[tab] || []) : [], owned = v => (S.items || []).includes(`${tab}:${v}`);
+      const lockedV = v => extra.includes(v) && !owned(v);
+      const swatch = v => AV.GRAD[v] ? `linear-gradient(135deg,#${AV.GRAD[v][0]},#${AV.GRAD[v][1]})` : `#${v}`;
+      $("#av-grid").innerHTML = [...AV.OPTS[tab], ...extra].map(v => AV_COLORS.has(tab)
+        ? `<button class="av-opt sw ${lockedV(v) ? "locked" : ""}" data-v="${v}" aria-pressed="${draft[tab] === v}"><span style="background:${swatch(v)}"></span></button>`
+        : `<button class="av-opt" data-v="${v}" aria-pressed="${draft[tab] === v}">${!v ? "🚫" : avaSvg({ ...draft, [tab]: v })}</button>`).join("");
+      $("#av-name").textContent = AV_TABS.find(([k]) => k === tab)[1];
+      $$("[data-avt]").forEach(b => (b.onclick = () => { tab = b.dataset.avt; draw(); }));
+      $$("#av-grid .av-opt").forEach(b => (b.onclick = () => {
+        if (b.classList.contains("locked")) return toast("🎁 Bu noyob buyum sandiqdan chiqadi");
+        draft = { ...draft, [tab]: b.dataset.v }; draw();
+      }));
+    };
+    sheet(`<h3>🧑‍🎨 Mening avatarim</h3>
+      <div class="av-prev" id="av-prev"></div>
+      <div class="av-tabs" id="av-tabs"></div><b id="av-name" class="av-name"></b>
+      <div class="av-grid" id="av-grid"></div>
+      <div class="av-row"><button class="btn btn-soft" id="av-rnd">🎲 Tasodifiy</button><button class="btn btn-brand" id="av-save">💾 Saqlash</button></div>
+      <button class="btn btn-soft btn-block" data-close>Bekor qilish</button>
+      <p class="muted av-credit">Avatar dizayni: «Adventurer», Lisa Wischofsky (CC BY 4.0)</p>`);
+    $("#av-rnd").onclick = () => { draft = AV.random(); draw(); };
+    $("#av-save").onclick = () => {
+      S.avatar = draft; closeSheet(); render(); saveResult(0, 0, "avatar", []);
+      toast("✨ Avatar saqlandi! Endi reyting va duelda ko'rinadi");
+    };
+    draw();
+  }
+
+  function renderProfile() {
+    const pa = $("#p-ava"), mine = avaSvg(S.avatar);
+    pa.classList.toggle("has-img", !!mine);
+    if (mine) pa.innerHTML = mine; else pa.textContent = (ME.name || "D")[0].toUpperCase();
+    pa.onclick = $("#p-ava-edit").onclick = avatarEditor;
+    $("#p-ava-edit").textContent = S.avatar ? "🧑‍🎨 Avatarni o'zgartirish" : "🧑‍🎨 Avatarimni yaratish";
+    $("#p-name").textContent = ME.name;
+    $("#p-rank").textContent = rankOf(ME.xp);
+    $("#p-xp").textContent = ME.xp;
+    $("#p-streak").textContent = streakNow();
+    $("#p-lessons").textContent = `${D.lessons.filter(l => passed(l.number)).length}/${D.lessons.length}`;
+    $("#p-exam").textContent = S.examBest ? S.examBest + "%" : "—";
+    const have = new Set(S.badges);
+    $("#p-badge-sum").textContent = `${have.size}/${BADGES.length}`;
+    $("#p-badges").innerHTML = BADGES.map(([c, e, n, d]) => `<div class="bdg ${have.has(c) ? "" : "off"}"><div class="e">${e}</div><b>${esc(n)}</b><small>${esc(d)}</small></div>`).join("");
+  }
+
+  // Reyting: haftalik — o'z guruhi ichida, oylik — barcha guruhlar bo'yicha umumiy
+  let boardMode = "week";
+  const MONTHS = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avgust", "sentabr", "oktabr", "noyabr", "dekabr"];
+  async function renderBoard() {
+    $$("[data-board]").forEach(b => b.setAttribute("aria-pressed", b.dataset.board === boardMode));
+    $('[data-board="journal"]').hidden = !(ME.group && ME.group.journal);
+    if (boardMode === "journal") return renderJournalBoard();
+    $("#t-note").textContent = boardMode === "week" ? "Guruhingiz ichida · dushanba noldan boshlanadi"
+      : boardMode === "year" ? "Barcha guruhlar · 1-yanvardan noldan · yil oxirida 🏆 Yil chempioni" : "Barcha guruhlar · har oy 1-sanada noldan";
+    const medal = ["🥇", "🥈", "🥉"];
+    if (boardMode === "month" || boardMode === "year") {
+      const mode = boardMode, yr = mode === "year";
+      $("#t-champ").hidden = true;
+      try {
+        const b = await rpc(yr ? "leaderboard_year" : "leaderboard_month", { p_token: TOKEN });
+        if (boardMode !== mode) return;
+        if (yr && b.champion) { $("#t-champ").hidden = false; $("#t-champ").innerHTML = `${avaSvg(b.champion.ava) ? `<span class="champ-ava">${avaSvg(b.champion.ava)}</span>` : ""}<small>🏆 ${b.year - 1}-yil chempioni</small><b>${esc(b.champion.name)}</b> · ${b.champion.xp} XP`; }
+        const mon = yr ? null : MONTHS[+b.month.slice(5) - 1];
+        const mine = b.mine && !b.top.some(r => r.id === b.me)
+          ? `<div class="row me"><span class="rank">${b.mine.rank}</span>${avaHtml(S.avatar, ME.name)}<span class="name"><b>${esc(ME.name)} (siz)</b></span><span class="xp">${b.mine.xp}</span></div>` : "";
+        $("#t-board").innerHTML = `<p class="muted" style="margin:6px 0">🗓 ${yr ? `${b.year}-yil` : `${cap(mon)} oyi`} · TOP ${b.top.length}</p>` + (b.top.length ? b.top.map(r => `
+          <div class="row ${r.id === b.me ? "me" : ""}">
+            <span class="rank">${medal[r.rank - 1] || r.rank}</span>${avaHtml(r.ava, r.name)}
+            <span class="name"><b>${esc(r.name)}${r.id === b.me ? " (siz)" : ""}</b><small class="muted">${esc(r.group)}</small></span>
+            <span class="xp">${r.xp}</span></div>`).join("") + mine
+          : `<p class="muted">Bu ${yr ? "yil" : "oy"} hali hech kim ball yig'madi. Birinchi bo'ling! 🔥</p>`);
+      } catch (e) { $("#t-board").innerHTML = `<p class="muted">${esc(errText(e))}</p>`; }
+      return;
+    }
+    try {
+      const b = await rpc("leaderboard", { p_token: TOKEN });
+      if (boardMode !== "week") return;
+      $("#t-champ").hidden = !b.champion;
+      if (b.champion) $("#t-champ").innerHTML = `${avaSvg(b.champion.ava) ? `<span class="champ-ava">${avaSvg(b.champion.ava)}</span>` : ""}<small>👑 O'tgan hafta chempioni</small><b>${esc(b.champion.name)}</b> · ${b.champion.xp} XP`;
+      $("#t-board").innerHTML = b.week.length ? b.week.map((r, i) => `
+        <div class="row ${r.id === b.me ? "me" : ""}">
+          <span class="rank">${medal[i] || i + 1}</span>${avaHtml(r.ava, r.name)}
+          <span class="name"><b>${esc(r.name)}${b.champion && b.champion.id === r.id ? " 👑" : ""}${SARDOR.has(r.id) ? " 🏅" : ""}${r.id === b.me ? " (siz)" : ""}</b></span>
+          <span class="xp">${r.xp}</span></div>`).join("")
+        : `<p class="muted">Bu hafta hali hech kim ball yig'madi. Birinchi bo'ling! 🔥</p>`;
+    } catch (e) { $("#t-board").innerHTML = `<p class="muted">${esc(errText(e))}</p>`; }
+  }
+
+  // ---------- Kirish ----------
+  let authMode = "join";
+  function showAuth() {
+    $("#auth").hidden = false;
+    const setMode = m => {
+      authMode = m;
+      $("#auth-tab-join").setAttribute("aria-pressed", m === "join");
+      $("#auth-tab-login").setAttribute("aria-pressed", m === "login");
+      $("#auth-pin-hint").textContent = m === "join" ? "(4 ta raqam, o'zingiz o'ylab toping va eslab qoling)" : "(ro'yxatdan o'tgandagi 4 ta raqam)";
+      $("#auth-submit").textContent = m === "join" ? "Boshlash 🚀" : "Kirish";
+      $("#auth-err").hidden = true;
+    };
+    $("#auth-tab-join").onclick = () => setMode("join");
+    $("#auth-tab-login").onclick = () => setMode("login");
+    $("#auth-pin").oninput = e => (e.target.value = e.target.value.replace(/\D/g, "").slice(0, 4));
+    $("#auth-form").onsubmit = async e => {
+      e.preventDefault();
+      const code = $("#auth-code").value.trim(), name = $("#auth-name").value.trim(), pin = $("#auth-pin").value.trim();
+      const err = msg => { $("#auth-err").textContent = msg; $("#auth-err").hidden = false; };
+      if (!code) return err("Guruh kodini yozing.");
+      if (name.length < 2) return err(ERRORS.BAD_NAME);
+      if (!/^\d{4}$/.test(pin)) return err(ERRORS.BAD_PIN);
+      $("#auth-submit").disabled = true;
+      try {
+        const r = await rpc(authMode === "join" ? "join_group" : "login", { p_code: code, p_name: name, p_pin: pin });
+        TOKEN = r.token; store.set(K_TOKEN, TOKEN);
+        $("#auth").hidden = true;
+        await boot();
+        if (authMode === "join") toast(`Xush kelibsiz, ${ME.name}! 🎉 PIN'ingizni eslab qoling`);
+      } catch (ex) { err(errText(ex)); }
+      finally { $("#auth-submit").disabled = false; }
+    };
+    setMode(authMode);
+  }
+
+  function logout(expired) {
+    TOKEN = null; ME = null; S = fresh();
+    store.del(K_TOKEN); store.del(K_CACHE); store.del(K_PENDING);
+    // test ochiq bo'lsa (seans test ustida tugagan) — yopamiz, aks holda kirish oynasi ostida qotib qoladi
+    if (run) { clearInterval(run.timer); if (player) player.pause(); run = null; $("#quiz").hidden = true; document.body.style.overflow = ""; }
+    const wm = $("#world"); if (wm) wm.remove();
+    $("#fon").hidden = true;
+    closeSheet();
+    showAuth();
+    if (expired) toast(ERRORS.AUTH);
+  }
+
+  // ---------- Darslar: ikki bo'lim (ustoz, 2026-10-12) ----------
+  // «Darslar»ning tepasida quyosh (Grammatika — hozirgi darslar xaritasi) va oy (Fonetika — alohida, yangicha uslubda; tayyorlanmoqda).
+  // Missiya, duel va reyting Fonetikaga qo'shilmaydi. Tanlov «tb_course» da eslab qolinadi.
+  function setCourse(c) {
+    $$("[data-course]").forEach(b => b.setAttribute("aria-pressed", b.dataset.course === c));
+    $("#course-gram").hidden = c !== "gram"; $("#course-fon").hidden = c !== "fon";
+  }
+  $$("[data-course]").forEach(b => (b.onclick = () => { sfx("tap"); store.set("tb_course", b.dataset.course); setCourse(b.dataset.course); }));
+  setCourse(store.get("tb_course") === "fon" ? "fon" : "gram");
+
+  // Telefonda ilova yopilmay, kunlab ochiq turadi. Qaytib kirilganda sana, XP va ustoz ochgan darslar yangilanadi
+  // (aks holda ertasi kuni ham «bugungi missiya bajarildi» deb turadi va olov yonmaydi). O'quv holati (S) ga tegilmaydi.
+  let meAt = 0;
+  async function refreshMe() {
+    if (!TOKEN || !ME || run || Date.now() - meAt < 30000) return;
+    meAt = Date.now();
+    let m;
+    try { m = await rpc("me", { p_token: TOKEN }); } catch (e) { if (e.message === "AUTH") logout(true); return; }
+    if (!ME || !TOKEN || run) return;
+    if (m.group && m.group.journal) return;
+    const same = m.today === ME.today && m.xp === ME.xp && m.name === ME.name && JSON.stringify(m.group) === JSON.stringify(ME.group);
+    ME = { ...ME, name: m.name, xp: m.xp, today: m.today, practice_today: m.practice_today, group: m.group };
+    if (same) return;
+    store.set(K_CACHE, JSON.stringify({ ME, S }));
+    render();
+    if (!$("#screen-top").hidden) renderBoard();
+  }
+
+  async function boot() {
+    try {
+      ME = await rpc("me", { p_token: TOKEN });
+      if (ME.group && ME.group.journal) return location.replace("pro/");   // Dod Pro o'quvchilari — alohida sahifada
+      S = Object.assign(fresh(), ME.state || {});
+      // Internetsiz ishlangan natija hali yuborilmagan bo'lsa, telefondagi holat serverdagidan yangiroq — o'shani olamiz (aks holda o'tilgan dars yo'qoladi)
+      if (pending().length) { try { const c = JSON.parse(store.get(K_CACHE) || "null"); if (c && c.S) S = Object.assign(fresh(), c.S); } catch { /* */ } }
+      meAt = Date.now();
+      store.set(K_CACHE, JSON.stringify({ ME, S }));
+    } catch (e) {
+      if (e.message === "AUTH") return logout(true);
+      // Internet yo'q — oxirgi saqlangan holat bilan ishlaymiz
+      try { const c = JSON.parse(store.get(K_CACHE) || "null"); if (c) { ME = c.ME; S = Object.assign(fresh(), c.S); } } catch { /* */ }
+      if (!ME) { toast(ERRORS.NET); return setTimeout(boot, 5000); }
+      toast("📶 Internet yo'q. Natijalar keyin yuboriladi");
+    }
+    render();
+    flushPending();
+    loadInbox();
+    loadMyAttendance();
+    loadMyProgress();
+    loadKarvon();
+    if (TROPHY_ON()) loadTrophies();
+    loadSpeakBadge();
+    // Taklif havolasi orqali kelgan bo'lsa — taklif qilganni bog'laymiz (faqat yangi hisob uchun ishlaydi)
+    const ref = store.get(K_REF);
+    if (ref) { store.del(K_REF); try { const r = await rpc("ref_set", { p_token: TOKEN, p_ref: ref }); if (r.ok) toast(`🤝 ${r.inviter} taklifi qabul qilindi! Birinchi darsni o'ting, ikkalangizga +${REF_BONUS} XP`); } catch { /* */ } }
+    loadRef();
+    refClaim();
+  }
+
+  // ---------- 📝 Jonli dars davomati: kelmadi −50 XP, kechikdi −20 XP (ustoz qarori) ----------
+  const ATT = { present: ["✅", "Keldi", 0], late: ["⏰", "Kechikdi", 20], absent: ["❌", "Kelmadi", 50] };
+  const MONTHS_GEN = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avgust", "sentabr", "oktabr", "noyabr", "dekabr"];
+  const dayName = d => `${+d.slice(8)}-${MONTHS_GEN[+d.slice(5, 7) - 1]}`;
+  let attDay = null, attToday = null;
+
+  async function teacherAttLoad() {
+    const box = $("#tc-att");
+    let r;
+    try { r = await rpc("teacher_attendance", { p_token: TT, p_day: attDay || (TC && TC.today) || today() }); }
+    catch (e) { box.innerHTML = `<div class="card"><p>${esc(errText(e))}</p></div>`; return; }
+    attDay = r.day; attToday = r.today;
+    const st = r.students, cnt = k => st.filter(s => s.status === k).length, none = st.filter(s => !s.status).length;
+    box.innerHTML = `
+      <p class="muted" style="font-size:12.5px;margin:0 2px 10px">❌ Kelmadi: <b>−50 XP</b> · ⏰ Kechikdi: <b>−20 XP</b>. Belgini o'zgartirsangiz, XP avtomatik qaytariladi.</p>
+      <div class="card">
+        <div class="att-head"><button class="btn btn-soft" data-ad="-1" aria-label="Oldingi kun">◀</button>
+          <b>${attDay === attToday ? "Bugun, " : ""}${dayName(attDay)}</b>
+          <button class="btn btn-soft" data-ad="1" ${attDay >= attToday ? "disabled" : ""} aria-label="Keyingi kun">▶</button></div>
+        <div class="att-sum"><span>✅ ${cnt("present")}</span><span>⏰ ${cnt("late")}</span><span>❌ ${cnt("absent")}</span>${none ? `<span>⬜ belgilanmagan: ${none}</span>` : ""}</div>
+        ${none ? `<button class="btn btn-soft btn-block" id="att-all" style="margin-bottom:6px">✅ Qolganlarning hammasi keldi</button>` : ""}
+        ${st.length ? st.map(s => `<div class="att-row">${avaHtml(s.ava, s.name)}<span class="name">${esc(s.name)}</span>
+          <span class="att-btns">${Object.entries(ATT).map(([k, [ic, n]]) => `<button data-sid="${s.id}" data-s="${k}" aria-pressed="${s.status === k}" aria-label="${n}" title="${n}">${ic}</button>`).join("")}</span></div>`).join("")
+          : `<p class="muted">Guruhda hali o'quvchi yo'q.</p>`}
+      </div>`;
+    $$("[data-ad]").forEach(b => (b.onclick = () => { attDay = addDays(attDay, +b.dataset.ad); teacherAttLoad(); }));
+    $$(".att-btns button").forEach(b => (b.onclick = async () => {
+      const cur = st.find(s => s.id === b.dataset.sid);
+      const next = cur.status === b.dataset.s ? null : b.dataset.s;   // qayta bossa — belgi olib tashlanadi
+      try {
+        const res = await rpc("teacher_mark", { p_token: TT, p_day: attDay, p_student: cur.id, p_status: next });
+        if (res.delta > 0) toast(`${cur.name}: −${res.delta} XP`);
+        else if (res.delta < 0) toast(`${cur.name}: +${-res.delta} XP qaytarildi`);
+      } catch (e) { toast(e.message === "BAD_DAY" ? "Faqat oxirgi 30 kunni belgilash mumkin" : errText(e)); }
+      teacherAttLoad();
+    }));
+    const all = $("#att-all");
+    if (all) all.onclick = async () => {
+      all.disabled = true;
+      for (const s of st.filter(x => !x.status)) {
+        try { await rpc("teacher_mark", { p_token: TT, p_day: attDay, p_student: s.id, p_status: "present" }); } catch { /* keyingisi */ }
+      }
+      teacherAttLoad();
+    };
+  }
+
+  // O'quvchi: profilda jonli darslar davomati; yangi jarima bo'lsa, bir marta xabar
+  async function loadMyAttendance() {
+    let list;
+    try { list = await rpc("attendance_mine", { p_token: TOKEN }); } catch { return; }
+    $("#p-att-wrap").hidden = !list.length;
+    if (!list.length) return;
+    const c = k => list.filter(x => x.status === k).length;
+    $("#p-att-sum").textContent = `${Math.round((c("present") + c("late")) * 100 / list.length)}% qatnashdingiz`;
+    $("#p-att").innerHTML = `<div class="att-stat"><div><b>${c("present")}</b><small>✅ keldi</small></div><div><b>${c("late")}</b><small>⏰ kechikdi</small></div><div><b>${c("absent")}</b><small>❌ kelmadi</small></div></div>`
+      + list.slice(0, 7).map(x => `<div class="att-row"><span class="name">${ATT[x.status][0]} ${dayName(x.day)}</span><small>${ATT[x.status][1]}${x.fine ? ` · −${x.fine} XP` : ""}</small></div>`).join("");
+    const seen = new Set((() => { try { return JSON.parse(store.get("dod_att_seen") || "[]"); } catch { return []; } })());
+    const fresh = list.filter(x => x.fine && !seen.has(x.day + x.status));
+    if (fresh.length) {
+      const x = fresh[0];
+      setTimeout(() => toast(`${ATT[x.status][0]} ${dayName(x.day)} darsiga ${x.status === "late" ? "kechikdingiz" : "kelmadingiz"}: −${x.fine} XP`), 1500);
+      store.set("dod_att_seen", JSON.stringify([...seen, ...list.filter(y => y.fine).map(y => y.day + y.status)].slice(-60)));
+    }
+  }
+
+  // ---------- 📈 Progress (Cambridge uslubi) ----------
+  const coursePct = ls => Math.round(Object.values(ls || {}).filter(v => v >= PASS).length * 100 / D.lessons.length);
+  const avgScore = ls => { const v = Object.values(ls || {}); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null; };
+  const attPct = a => { const n = a ? a.p + a.l + a.a : 0; return n ? Math.round((a.p + a.l) * 100 / n) : null; };
+  const daysIn = (a, b) => Math.round((new Date(b + "T00:00:00Z") - new Date(a + "T00:00:00Z")) / 86400000) + 1;
+  const PROG_SORTS = [["best", "🔥 Olov"], ["month_xp", "⭐ XP"], ["course", "📚 Kurs"], ["att", "📝 Davomat"], ["active", "📅 Faollik"]];
+  let progSort = "best";
+
+  async function teacherProgLoad() {
+    const box = $("#tc-prog");
+    let r;
+    try { r = await rpc("teacher_progress", { p_token: TT }); }
+    catch (e) { box.innerHTML = `<div class="card"><p>${esc(errText(e))}</p></div>`; return; }
+    const days = daysIn(r.month_start, r.today), mon = MONTHS[+r.month_start.slice(5, 7) - 1];
+    const rows = r.students.map(s => ({ ...s, course: coursePct(s.lessons), avg: avgScore(s.lessons), attp: attPct(s.att),
+      idle: s.last_seen ? Math.floor((Date.now() - new Date(s.last_seen)) / 86400000) : null }));
+    const val = s => progSort === "att" ? (s.attp ?? -1) : s[progSort];
+    rows.sort((a, b) => val(b) - val(a) || b.month_xp - a.month_xp);
+    const top = [...rows].sort((a, b) => b.best - a.best || b.streak - a.streak).filter(s => s.best > 0).slice(0, 3);
+    const show = s => ({ best: `🔥 ${s.best}`, month_xp: `⭐ ${s.month_xp}`, course: `${s.course}%`, att: s.attp == null ? "—" : `${s.attp}%`, active: `${s.active}/${days}` })[progSort];
+    box.innerHTML = `
+      <div class="prize"><small>🏆 ${cap(mon)} sovrini · eng uzun olov · ${r.olov_since > r.month_start ? `${dayName(r.olov_since)}dan` : "oy boshidan"}</small><b>Oy oxirida 1-o'rindagi g'olib bo'ladi 🎁</b>
+        ${top.length ? `<div class="podium">${top.map((s, i) => `<div><small>${["🥇", "🥈", "🥉"][i]}</small>${avaHtml(s.ava, s.name)}<b>${esc(s.name)}</b><small>🔥 ${s.best} kun</small></div>`).join("")}</div>`
+          : `<p style="margin:8px 0 0;opacity:.9">Bu oy hali hech kim olov yoqmadi.</p>`}</div>
+      <button class="btn btn-soft btn-block" id="olov-reset" style="margin:-4px 0 10px">🔄 Olov musobaqasini 0 dan boshlash</button>
+      <div class="seg" role="group" aria-label="Saralash" style="margin:0 0 10px">${PROG_SORTS.map(([k, n]) => `<button type="button" data-ps="${k}" aria-pressed="${k === progSort}">${n}</button>`).join("")}</div>
+      <p class="muted" style="font-size:12px;margin:0 2px 8px">🔥 olov: oy rekordi (hozirgisi) · 📚 o'tilgan darslar · 📅 ${cap(mon)}da faol kunlar · 📝 jonli darslarga qatnashish</p>
+      <div class="card">${rows.length ? rows.map((s, i) => `<div class="prog-row"><span class="rk">${i + 1}</span>${avaHtml(s.ava, s.name)}
+        <span class="nm"><b>${esc(s.name)}</b><small>🔥 ${s.best} (${s.streak}) · 📚 ${s.course}% · 📅 ${s.active}/${days} · 📝 ${s.attp == null ? "—" : s.attp + "%"}${s.idle >= 2 ? ` · <span class="idle">😴 ${s.idle} kun kirmadi</span>` : ""}</small></span>
+        <span class="val">${show(s)}</span></div>`).join("") : `<p class="muted">Guruhda hali o'quvchi yo'q.</p>`}</div>`;
+    $$("[data-ps]").forEach(b => (b.onclick = () => { progSort = b.dataset.ps; teacherProgLoad(); }));
+    $("#olov-reset").onclick = () => {
+      sheet(`<h3>🔄 Olov musobaqasini 0 dan boshlash</h3>
+        <p>Guruhdagi <b style="color:var(--ink)">hammaning olovi bugundan noldan</b> hisoblanadi: sovrin kartasi ham, o'quvchilardagi 🔥 raqami ham. Musobaqa oy oxirigacha davom etadi, keyingi oyning 1-sanasida o'zi yana boshlanadi.</p>
+        <button class="btn btn-danger btn-block" id="olov-yes">Ha, 0 dan boshlash</button><button class="btn btn-soft btn-block" data-close>Bekor qilish</button>`);
+      $("#olov-yes").onclick = async () => {
+        try { await rpc("teacher_reset_olov", { p_token: TT }); toast("🔥 Olov musobaqasi bugundan boshlandi!"); }
+        catch (e) { return toast(errText(e)); }
+        closeSheet(); teacherProgLoad();
+      };
+    };
+  }
+
+  // O'quvchi: profildagi «Mening progressim»
+  // Kartalar bosilganda «qimirlab» qo'yadi va qisqa izoh chiqaradi (ustoz, 2026-10-07)
+  document.addEventListener("click", e => {
+    const c = e.target.closest(".pg, .stat, .tc-stat, .st-card"); if (!c) return;
+    c.classList.remove("wig"); void c.offsetWidth; c.classList.add("wig"); sfx("tap");
+    if (c.dataset.tip) toast(c.dataset.tip);
+  });
+  // 🐪 Karvon poygasi: bosh sahifada banner (bildirishnomasiz ham ko'rinadi) va 🏅 «Karvon sardori» belgisi
+  let SARDOR = new Set();
+  async function loadKarvon() {
+    if (!TOKEN || (ME && ME.group && ME.group.journal)) return;
+    try { SARDOR = new Set(await rpc("karvon_sardors", { p_token: TOKEN })); } catch { /* */ }
+    const ps = $("#p-sardor"); if (ps) ps.hidden = !(ME && SARDOR.has(ME.id));
+    const box = $("#kv-banner"); if (!box) return;
+    let k; try { k = await rpc("karvon_status", { p_token: TOKEN }); } catch { return; }
+    const sunday = k.today === k.sunday, txt = k.game && k.game.status !== "done" ? ["🐪", "Karvon poygasi boshlandi!", "Hoziroq kiring →"]
+      : sunday && k.registered ? ["🐪", "Bugun soat 20:00 da Karvon poygasi!", "Jamoangizni ko'rish →"]
+      : k.open && !k.registered ? ["✋", "Karvon poygasiga ro'yxat ochiq — juma kuni yopiladi!", "Qatnashaman →"]
+      : k.registered ? ["✅", `Siz yakshanba o'yiniga ro'yxatdasiz · ${k.reg_count} kishi`, "Batafsil →"] : null;
+    box.innerHTML = txt ? `<button class="kv-ban"><span class="e">${txt[0]}</span><span class="t"><b>${txt[1]}</b><small>${txt[2]}</small></span></button>` : "";
+    const b = box.querySelector("button");
+    if (b) b.onclick = () => { try { (window.top || window).location.href = new URL("markaz/#sunday", location.href).href; } catch { location.href = "markaz/#sunday"; } };
+  }
+  async function loadMyProgress() {
+    let p;
+    try { p = await rpc("progress_mine", { p_token: TOKEN }); } catch { return; }
+    const days = daysIn(p.month_start, p.today), passedN = Object.values(S.lessons).filter(v => v >= PASS).length;
+    const avg = avgScore(S.lessons), att = attPct(p.att);
+    const tile = (label, big, sub, pct, tip) => `<div class="pg" role="button" tabindex="0" data-tip="${esc(tip || "")}"><small>${label}</small><b>${big}</b>${pct != null ? `<div class="bar"><i style="width:${Math.max(0, Math.min(100, pct))}%"></i></div>` : ""}<span>${sub}</span></div>`;
+    $("#p-prog-wrap").hidden = false;
+    $("#p-prog-sum").textContent = `guruhda ${p.rank_xp}-o'rin`;
+    $("#p-prog").innerHTML = [
+      tile("📚 Kurs", `${coursePct(S.lessons)}%`, `${passedN}/${D.lessons.length} dars o'tildi`, coursePct(S.lessons), "📚 Butun kursning qancha qismini o'tdingiz. Har bir darsdan 80%+ oling — foiz oshadi"),
+      tile("🎯 O'rtacha natija", avg == null ? "—" : `${avg}%`, "darslardagi eng yaxshi natijalar", avg, "🎯 Darslardagi eng yaxshi natijalaringizning o'rtachasi. Darsni qayta ishlab, oshirsa bo'ladi"),
+      tile("🔥 Olov", `${p.streak || 0} kun`, `oy rekordi: ${p.best || 0} · ${p.rank_best}-o'rin`, null, "🔥 Har kuni kunlik missiyani bajarsangiz, olov yonib turadi. Bir kun qoldirsangiz — o'chadi"),
+      tile("📅 Bu oy faol", `${p.active || 0}/${days}`, "kun ilovada mashq qildingiz", Math.round((p.active || 0) * 100 / days), "📅 Bu oyda necha kun ilovada mashq qilganingiz"),
+      tile("⭐ Bu oy XP", p.month_xp || 0, `guruhda ${p.rank_xp}/${p.size}-o'rin`, null, "⭐ Bu oyda to'plagan XP'ingiz. Har 10 XP = 1 دِينَار (do'kon uchun)"),
+      tile("📝 Jonli darslar", att == null ? "—" : `${att}%`, att == null ? "hali belgilanmagan" : "qatnashish", att, "📝 Jonli darslarga qatnashishingiz (ustoz belgilaydi)"),
+    ].join("");
+  }
+
+  // ---------- 📒 Guruh jurnali (faqat «jurnal» guruhlarida, masalan DOD_PRO) ----------
+  // Ball: vaqtida +50, faol +100, sherigi topolmagan savol +10, uy vazifasi 100% +200.
+  // Jarima: sababsiz 5000, sababli 1000, kechikdi 2000, so'z 500 (darsda ≤3000), uy vazifasi yo'q 1000.
+  const fmtSom = n => `${String(Math.abs(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ")} so'm`;
+  const JR_ATT = { ontime: ["✅", "Vaqtida", "good"], late: ["⏰", "Kechikdi", "bad"], absent: ["❌", "Sababsiz", "bad"], excused: ["🟡", "Sababli", ""] };
+  const JR_RULES = `⭐ Ball: vaqtida keldi +50 · faol +100 · sherigi topolmagan savol +10 · uy vazifasi 100% +200<br>💸 Jarima: sababsiz 5 000 · sababli 1 000 · kechikdi 2 000 · yodlamagan so'z 500 (darsda ko'pi bilan 3 000) · uy vazifasi bajarilmadi 1 000`;
+  let jrDay = null, jrView = "day";
+
+  // Jadval (ustoz ham, o'quvchilar ham ko'radi)
+  function journalTable(b, teacher) {
+    const mon = MONTHS[+b.month_start.slice(5, 7) - 1];
+    return `<div class="kassa"><span class="ci">💰</span><div><small>Guruh kassasi · ${mon}</small><b>${fmtSom(b.kassa_month)}</b>
+        <small>Oy oxirida o'quvchilarning o'ziga sovg'a 🎁 · jami: ${fmtSom(b.kassa_total)}</small></div></div>
+      <p class="jr-rules">${JR_RULES}</p>
+      <div class="card">${b.students.length ? b.students.map((s, i) => `<${teacher ? `button class="prog-row jr-row" data-pay="${s.id}" style="width:100%;text-align:left"` : `div class="prog-row jr-row"`}>
+        <span class="rk">${["🥇", "🥈", "🥉"][i] || i + 1}</span>${avaHtml(s.ava, s.name)}
+        <span class="nm"><b>${esc(s.name)}${b.me === s.id ? " (siz)" : ""}</b><small>✅${s.att.ontime} ⏰${s.att.late} ❌${s.att.absent} 🟡${s.att.excused} · ⭐${s.active} faol · 📝${s.hw_full}/${s.hw_full + s.hw_none}</small></span>
+        <span class="val">${s.pts_m} ball<small class="${s.debt > 0 ? "debt" : "paid-ok"}">${s.debt > 0 ? `qarz ${fmtSom(s.debt)}` : s.fine_all ? "✅ to'langan" : "jarimasiz 👏"}</small></span>
+      </${teacher ? "button" : "div"}>`).join("") : `<p class="muted">Guruhda hali o'quvchi yo'q.</p>`}</div>`;
+  }
+
+  async function teacherJournalLoad() {
+    const box = $("#tc-jr");
+    const tabs = `<div class="seg" style="margin:0 0 10px"><button type="button" data-jv="day" aria-pressed="${jrView === "day"}">✏️ Kunlik belgilash</button><button type="button" data-jv="table" aria-pressed="${jrView === "table"}">📊 Jadval va kassa</button></div>`;
+    try {
+      if (jrView === "table") {
+        const b = await rpc("teacher_journal_board", { p_token: TT });
+        box.innerHTML = tabs + `<p class="muted" style="font-size:12.5px;margin:0 2px 8px">Jarima to'lovini yozish uchun o'quvchini bosing.</p>` + journalTable(b, true);
+        $$("[data-pay]").forEach(el => (el.onclick = () => paySheet(b.students.find(s => s.id === el.dataset.pay))));
+      } else {
+        const r = await rpc("teacher_journal_day", { p_token: TT, p_day: jrDay || (TC && TC.today) || today() });
+        jrDay = r.day;
+        box.innerHTML = tabs + `
+          <div class="card" style="margin-bottom:10px"><div class="att-head" style="margin:0"><button class="btn btn-soft" data-jd="-1" aria-label="Oldingi kun">◀</button>
+            <b>${jrDay === r.today ? "Bugun, " : ""}${dayName(jrDay)}</b><button class="btn btn-soft" data-jd="1" ${jrDay >= r.today ? "disabled" : ""} aria-label="Keyingi kun">▶</button></div></div>
+          ${r.students.length ? r.students.map(s => `<div class="jr-card" data-sid="${s.id}">
+            <div class="jr-top">${avaHtml(s.ava, s.name)}<span class="nm">${esc(s.name)}</span><span class="sc">⭐ ${s.pts}${s.fine ? ` · <span class="debt">💸 ${fmtSom(s.fine)}</span>` : ""}</span></div>
+            <div class="jr-btns">${Object.entries(JR_ATT).map(([k, [ic, n, cls]]) => `<button class="${cls}" data-f="att" data-v="${k}" aria-pressed="${s.att === k}">${ic} ${n}</button>`).join("")}</div>
+            <div class="jr-cnt">${[["active", "⭐ Faol"], ["assist", "💡 Yordam"], ["words", "📚 So'z"]].map(([f, n]) => `<div><button data-f="${f}" data-d="-1" aria-label="Kamaytirish">−</button><span>${n} ${s[f]}</span><button data-f="${f}" data-d="1" aria-label="Qo'shish">+</button></div>`).join("")}</div>
+            <div class="jr-btns"><button class="good" data-f="hw" data-v="full" aria-pressed="${s.hw === "full"}">📝 Uy vazifasi 100%</button><button class="bad" data-f="hw" data-v="none" aria-pressed="${s.hw === "none"}">✖️ Bajarmadi</button></div>
+          </div>`).join("") : `<div class="card"><p class="muted">Guruhda hali o'quvchi yo'q. Ularga DOD_PRO kodini bering.</p></div>`}`;
+        $$("[data-jd]").forEach(b => (b.onclick = () => { jrDay = addDays(jrDay, +b.dataset.jd); teacherJournalLoad(); }));
+        $$(".jr-card button[data-f]").forEach(b => (b.onclick = async () => {
+          const card = b.closest(".jr-card"), s = r.students.find(x => x.id === card.dataset.sid), f = b.dataset.f;
+          const v = b.dataset.d ? String(Math.max(0, s[f] + +b.dataset.d)) : (s[f] === b.dataset.v ? "" : b.dataset.v);   // qayta bossa — olib tashlanadi
+          b.disabled = true;
+          try { await rpc("teacher_journal_set", { p_token: TT, p_day: jrDay, p_student: s.id, p_field: f, p_value: v }); sfx("tap"); }
+          catch (e) { toast(e.message === "BAD_DAY" ? "Faqat oxirgi 60 kunni belgilash mumkin" : errText(e)); }
+          teacherJournalLoad();
+        }));
+      }
+    } catch (e) { box.innerHTML = tabs + `<div class="card"><p>${esc(errText(e))}</p></div>`; }
+    $$("[data-jv]").forEach(b => (b.onclick = () => { jrView = b.dataset.jv; teacherJournalLoad(); }));
+  }
+
+  function paySheet(s) {
+    sheet(`<h3>💸 ${esc(s.name)}: jarima to'lovi</h3>
+      <p>Jami jarima: <b style="color:var(--ink)">${fmtSom(s.fine_all)}</b> · to'langan: <b style="color:var(--ink)">${fmtSom(s.paid)}</b><br>
+        ${s.debt > 0 ? `Qarz: <b class="debt">${fmtSom(s.debt)}</b>` : "Qarzi yo'q ✅"}</p>
+      <input class="input" id="pay-sum" inputmode="numeric" placeholder="Summa (so'm)" value="${s.debt > 0 ? s.debt : ""}">
+      <button class="btn btn-brand btn-block" id="pay-ok">✅ To'landi deb yozish</button>
+      <button class="btn btn-soft btn-block" id="pay-undo">↩️ Xato yozilgan to'lovni ayirish</button>
+      <button class="btn btn-soft btn-block" data-close>Yopish</button>`);
+    const go = async sign => {
+      const n = parseInt(($("#pay-sum").value || "").replace(/\D/g, ""), 10);
+      if (!n) return toast("Summani yozing");
+      try { await rpc("teacher_payment", { p_token: TT, p_student: s.id, p_amount: sign * n }); toast(sign > 0 ? `💰 ${fmtSom(n)} kassaga qo'shildi` : `↩️ ${fmtSom(n)} ayirildi`); }
+      catch (e) { toast(errText(e)); return; }
+      closeSheet(); teacherJournalLoad();
+    };
+    $("#pay-ok").onclick = () => go(1);
+    $("#pay-undo").onclick = () => go(-1);
+  }
+
+  // O'quvchi: Reyting → «📒 Jurnal»
+  async function renderJournalBoard() {
+    $("#t-champ").hidden = true;
+    $("#t-note").textContent = "Guruh jurnali · darsdagi ball va jarimalar";
+    try {
+      const b = await rpc("journal_board", { p_token: TOKEN });
+      if (boardMode !== "journal") return;
+      const mine = b.mine.length ? `<h3 style="font-size:15px;margin:14px 2px 8px">🗒 Mening yozuvlarim</h3><div class="card">${b.mine.map(x => `<div class="att-row"><span class="name">${x.att ? JR_ATT[x.att][0] : "▫️"} ${dayName(x.day)}</span>
+          <small>${[x.active ? `⭐${x.active}` : "", x.assist ? `💡${x.assist}` : "", x.hw === "full" ? "📝✓" : x.hw === "none" ? "📝✖" : "", x.words ? `📚${x.words}` : ""].filter(Boolean).join(" ")} · +${x.pts}${x.fine ? ` · <span class="debt">−${fmtSom(x.fine)}</span>` : ""}</small></div>`).join("")}</div>` : "";
+      $("#t-board").innerHTML = journalTable(b, false) + mine;
+    } catch (e) { $("#t-board").innerHTML = `<p class="muted">${esc(errText(e))}</p>`; }
+  }
+
+  // ---------- Ustoz paneli ----------
+  let TT = null, TC = null;
+
+  // Darslarni ochish: har bir daraja alohida. Bazada bitta son (umumiy tartib bo'yicha nechta dars ochiq)
+  function renderTcLevels(g) {
+    const groups = LEVELS.map(([code, name]) => ({ code, name, ls: D.lessons.filter(l => levelOf(l.number) === code) })).filter(x => x.ls.length && OPEN_FIELD[x.code]);
+    $("#tc-levels").innerHTML = groups.map((gr, i) => {
+      const n = gr.ls.length, k = Math.min(n, openCount(gr.code, g)), min = gr.code === "Pre-A1" ? 1 : 0;
+      const last = k ? gr.ls[k - 1] : null;
+      const note = last ? `Oxirgisi: ${lname(last.number)} · ${D.lessonTitles[last.number]}` : "Hali ochilmagan";
+      return `<div class="tc-row"><span style="min-width:0"><b>${gr.code} · <span class="ar">${gr.name}</span></b><small class="muted">${esc(note)}</small></span>
+        <span class="stepper"><button class="btn btn-soft" data-lv="${i}" data-d="-1" ${k > min ? "" : "disabled"} aria-label="Bittasini yopish">−</button><b>${k}/${n}</b>
+        <button class="btn btn-brand" data-lv="${i}" data-d="1" ${k < n ? "" : "disabled"} aria-label="Keyingisini ochish">+</button></span></div>`;
+    }).join("");
+    $$("#tc-levels [data-lv]").forEach(b => (b.onclick = () => {
+      const code = groups[+b.dataset.lv].code, v = openCount(code, g) + +b.dataset.d;
+      teacherSet(code === "Pre-A1" ? v : null, null, code === "A1" ? v : null);
+    }));
+  }
+  async function teacherLoad() {
+    try { TC = await rpc("teacher_overview", { p_token: TT }); }
+    catch (e) {
+      if (e.message === "TEACHER_AUTH") {   // seans tugagan yoki parol o'zgargan
+        TT = null; store.del(K_TEACHER); store.del(K_MODE);
+        toast(ERRORS.TEACHER_AUTH);
+        return showStudentSide();
+      }
+      $("#tc-list").innerHTML = `<div class="card"><p>${esc(errText(e))}</p></div>`;
+      return;
+    }
+    const g = TC.group, t = TC.today;
+    $("#tc-group").textContent = g.name;
+    $("#tc-code").textContent = g.code || "DOD_ARABIC";
+    $('[data-tct="journal"]').hidden = !g.journal;
+    renderTcLevels(g);
+    $("#tc-exam-state").textContent = g.exam_open ? "ochiq ✅" : "yopiq 🔒";
+    $("#tc-exam").textContent = g.exam_open ? "Yopish" : "Ochish";
+    $("#tc-exam").className = "btn " + (g.exam_open ? "btn-danger" : "btn-brand");
+
+    const days = Array.from({ length: 7 }, (_, i) => addDays(t, i - 6));
+    const studs = TC.students;
+    const activeToday = studs.filter(s => (s.days || {})[t]).length;
+    const active7 = studs.filter(s => Object.keys(s.days || {}).length).length;
+    $("#tc-stats").innerHTML = `
+      <div class="tc-stat"><b>${studs.length}</b><small>talaba</small></div>
+      <div class="tc-stat"><b>${activeToday}</b><small>bugun faol</small></div>
+      <div class="tc-stat"><b>${active7}</b><small>7 kunda faol</small></div>`;
+    const peak = Math.max(1, ...studs.flatMap(s => Object.values(s.days || {})));
+    $("#tc-list").innerHTML = studs.length ? studs.map(s => {
+      const per = days.map(d => (s.days || {})[d] || 0);
+      const act = per.filter(Boolean).length;
+      const dot = act >= 5 ? "🟢" : act >= 2 ? "🟡" : "🔴";
+      const spark = per.map(n => `<i class="${n ? "" : "zero"}" style="height:${n ? Math.max(4, Math.round(Math.log(n + 1) / Math.log(peak + 1) * 26)) : 3}px" title="${n} ta javob"></i>`).join("");
+      const lessonsPassed = Object.values(s.lessons || {}).filter(v => v >= PASS).length;
+      const skills = Object.entries(s.skills || {}).map(([k, [c, n]]) => `${SKILLS[k] ? SKILLS[k].split(" ")[0] : k} ${Math.round(c * 100 / n)}%`).join(" · ");
+      const seen = s.last_seen ? new Date(s.last_seen) : null;
+      const ago = seen ? Math.floor((Date.now() - seen) / 86400000) : null;
+      const agoTxt = ago === null ? "—" : ago === 0 ? "bugun" : ago === 1 ? "kecha" : `${ago} kun oldin`;
+      return `<div class="st">
+        <button class="st-row" data-open aria-expanded="false"><span>${dot}</span><span class="name"><b>${esc(s.name)}</b><small>oxirgi: ${agoTxt} · 📚 ${lessonsPassed}/${D.lessons.length}</small></span>
+          <span class="spark" aria-label="7 kunlik faollik">${spark}</span><span class="xp">⭐ ${s.week_xp}</span></button>
+        <div class="st-more" hidden>
+          <div class="st-meta"><span>⭐ ${s.week_xp} hafta / ${s.xp} jami</span><span>🔥 ${s.streak}</span>
+            ${s.exam_best ? `<span>🎓 ${s.exam_best}%</span>` : ""}<span>❌ ${s.mistakes}</span><span>⚔️ ${s.duel_wins}/${s.duels}</span>${skills ? `<span>${esc(skills)}</span>` : ""}</div>
+          <div class="st-actions"><button class="btn btn-soft" data-pin="${s.id}" data-name="${esc(s.name)}">🔑 PIN yangilash</button>
+            <button class="btn btn-danger" data-del="${s.id}" data-name="${esc(s.name)}">O'chirish</button></div></div></div>`;
+    }).join("") : `<div class="card"><p>Hali talabalar yo'q. Ularga ilova havolasi va <b>${esc(TC.group.code || "DOD_ARABIC")}</b> kodini bering.</p></div>`;
+    $("#tc-hard").innerHTML = TC.hardest.length ? TC.hardest.map(h => `<div class="hard"><span class="${isAr(h.topic) ? "ar" : ""}">${esc(h.topic)}</span><b>${h.wrong}/${h.total} xato</b></div>`).join("")
+      : `<p class="muted" style="margin:0">Hozircha ma'lumot yetarli emas.</p>`;
+    $("#tc-duels").innerHTML = TC.duels.length ? TC.duels.map(d => `<div class="hard"><span>${esc(d.a)} ⚔️ ${esc(d.b)}</span><b>${d.status === "done" ? `${d.a_score}:${d.b_score} · ${d.winner ? "🏆 " + esc(d.winner) : "🤝"}` : d.status === "declined" ? "rad etildi" : "kutilmoqda"}</b></div>`).join("")
+      : `<p class="muted" style="margin:0">Oxirgi 24 soatda duel bo'lmadi.</p>`;
+
+    rpc("teacher_refs", { p_token: TT }).then(refs => {
+      $("#tc-refs-sum").textContent = refs.length ? `${refs.filter(x => x.done).length}/${refs.length}` : "hali yo'q";
+      $("#tc-refs").innerHTML = refs.length ? refs.map(x => `<div class="hard"><span>${esc(x.by)} → <b>${esc(x.name)}</b></span><small>${x.done ? "✅ +100 XP berildi" : "⏳ 1-dars kutilmoqda"}</small></div>`).join("")
+        : `<p class="muted" style="margin:0">Hali hech kim do'stini taklif qilmagan.</p>`;
+    }).catch(() => {});
+    $$("#tc-list [data-open]").forEach(b => (b.onclick = () => {
+      const more = b.nextElementSibling; more.hidden = !more.hidden; b.setAttribute("aria-expanded", !more.hidden);
+    }));
+    $$("[data-pin]").forEach(b => (b.onclick = async () => {
+      try {
+        const r = await rpc("teacher_reset_pin", { p_token: TT, p_student: b.dataset.pin });
+        sheet(`<h3>🔑 Yangi PIN</h3><p><b style="color:var(--ink)">${esc(b.dataset.name)}</b> uchun yangi PIN:</p>
+          <div class="q-card"><div style="font-family:var(--f-display);font-size:40px;letter-spacing:.2em">${esc(r.pin)}</div></div>
+          <p>Talabaga ayting: ilovada «Menda hisob bor» bo'limidan ismi va shu PIN bilan kiradi.</p><button class="btn btn-brand btn-block" data-close>Tushunarli</button>`);
+      } catch (e) { toast(errText(e)); }
+    }));
+    $$("[data-del]").forEach(b => (b.onclick = () => {
+      sheet(`<h3>O'chirasizmi?</h3><p><b style="color:var(--ink)">${esc(b.dataset.name)}</b> va uning barcha natijalari o'chadi. Buni qaytarib bo'lmaydi.</p>
+        <button class="btn btn-danger btn-block" id="del-yes">Ha, o'chirish</button><button class="btn btn-soft btn-block" data-close>Bekor qilish</button>`);
+      $("#del-yes").onclick = async () => { try { await rpc("teacher_remove", { p_token: TT, p_student: b.dataset.del }); } catch (e) { toast(errText(e)); } closeSheet(); teacherLoad(); };
+    }));
+  }
+
+  // Ustoz: ovozli javoblarni tinglash va baholash
+  let tcPlayer = null;
+  async function teacherSpeakLoad() {
+    let list;
+    try { list = await rpc("teacher_speaking", { p_token: TT }); }
+    catch (e) { $("#tc-speak").innerHTML = `<div class="card"><p class="muted">${esc(errText(e))}</p></div>`; return; }
+    const pend = list.filter(x => x.pending);
+    $("#tc-speak-sum").textContent = pend.length ? `⏳ ${pend.length} ta baholanmagan javob bor` : "Hammasi baholangan ✅";
+    $("#tc-speak-count").hidden = !pend.length; $("#tc-speak-count").textContent = pend.length;
+    if (!list.length) { $("#tc-speak").innerHTML = `<div class="card"><p class="muted" style="margin:0">Hali ovozli javob yo'q.</p></div>`; return; }
+    const when = d => new Date(d).toLocaleString("uz", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+    $("#tc-speak").innerHTML = list.map(x => `
+      <div class="st" data-sp="${x.id}">
+        <div class="st-head"><span>${x.pending ? "⏳" : "✅"}</span><span class="name"><b>${esc(x.name)}</b><small>${esc(x.topic)} · ${fmt(x.seconds)} · ${when(x.created_at)}</small></span>
+          ${x.has_audio ? `<button class="btn btn-soft" data-listen="${x.id}" style="padding:8px 12px">▶️ Tinglash</button>` : `<small class="muted">ovoz o'chirilgan</small>`}</div>
+        <div class="audio-slot"></div>
+        ${x.pending ? `<div class="stars" role="group" aria-label="Baho">${[1, 2, 3, 4, 5].map(n => `<button data-star="${n}" aria-pressed="false">${n}⭐</button>`).join("")}</div>
+          <textarea class="input" placeholder="Izoh (ixtiyoriy): masalan, ض harfiga e'tibor bering" maxlength="500"></textarea>
+          <button class="btn btn-brand btn-block" data-grade="${x.id}" disabled>Baho qo'yish</button>`
+        : `<div class="st-meta"><span>${"⭐".repeat(x.score)}</span>${x.comment ? `<span>💬 ${esc(x.comment)}</span>` : ""}</div>`}
+      </div>`).join("");
+    $$("[data-listen]").forEach(b => (b.onclick = async () => {
+      const card = b.closest("[data-sp]"), slot = card.querySelector(".audio-slot");
+      b.disabled = true; b.textContent = "⏳";
+      try {
+        const a = await rpc("teacher_speaking_audio", { p_token: TT, p_id: +b.dataset.listen });
+        const bytes = Uint8Array.from(atob(a.b64), c => c.charCodeAt(0));
+        const url = URL.createObjectURL(new Blob([bytes], { type: a.mime.split(";")[0] }));
+        slot.innerHTML = `<audio controls src="${url}" style="width:100%"></audio>`;
+        if (tcPlayer) tcPlayer.pause();
+        tcPlayer = slot.querySelector("audio"); tcPlayer.play().catch(() => { /* foydalanuvchi o'zi bosadi */ });
+        b.textContent = "▶️ Tinglash";
+      } catch (e) { toast(errText(e)); b.textContent = "▶️ Tinglash"; }
+      b.disabled = false;
+    }));
+    $$("[data-sp]").forEach(card => {
+      let score = 0;
+      card.querySelectorAll("[data-star]").forEach(s => (s.onclick = () => {
+        score = +s.dataset.star;
+        card.querySelectorAll("[data-star]").forEach(x => x.setAttribute("aria-pressed", +x.dataset.star <= score));
+        card.querySelector("[data-grade]").disabled = false;
+      }));
+      const g = card.querySelector("[data-grade]");
+      if (g) g.onclick = async () => {
+        g.disabled = true;
+        try {
+          await rpc("teacher_speaking_grade", { p_token: TT, p_id: +g.dataset.grade, p_score: score, p_comment: card.querySelector("textarea").value });
+          toast(`✅ Baho qo'yildi: ${score}⭐ (+${score * 6} XP)`);
+          teacherSpeakLoad();
+        } catch (e) { toast(errText(e)); g.disabled = false; }
+      };
+    });
+  }
+
+  // Ustoz: haftalik hisobot
+  async function teacherReport(offset = 0) {
+    let r;
+    try { r = await rpc("teacher_report", { p_token: TT, p_week_offset: offset }); } catch (e) { return toast(errText(e)); }
+    const d = s => s.slice(8, 10) + "." + s.slice(5, 7);
+    const st = r.students;
+    const active = st.filter(s => s.answers > 0 || s.speak_n > 0);
+    const idle = st.filter(s => !(s.answers > 0 || s.speak_n > 0));
+    const tot = st.reduce((a, s) => [a[0] + s.correct, a[1] + s.answers], [0, 0]);
+    const pct = (c, n) => (n ? Math.round(c * 100 / n) + "%" : "—");
+    const medals = ["🥇", "🥈", "🥉"];
+    // Ixcham jadval: bir talaba = bir qator; bosilsa tafsilot ochiladi
+    const rows = active.map((s, i) => {
+      const skills = Object.entries(s.skills || {}).map(([k, [c, n]]) => `${SKILLS[k] ? SKILLS[k].split(" ")[0] : k} ${pct(c, n)}`).join(" · ");
+      const lessonsPassed = Object.values(s.lessons || {}).filter(v => v >= PASS).length;
+      return `<details class="rep-d"><summary class="rep-row"><b>${i < 3 ? medals[i] + " " : ""}${esc(s.name)}</b><span>⭐${s.week_xp}</span><small>${s.active_days}/7</small><small>${pct(s.correct, s.answers)}</small></summary>
+        <div class="rep-st" style="box-shadow:none;margin:6px 0 10px">
+          <small>🎯 ${s.answers} javob${skills ? ` · ${esc(skills)}` : ""}</small>
+          <small>📚 ${lessonsPassed}/${D.lessons.length} · ⚔️ ${s.duel_wins}/${s.duels} · ❌ ${s.mistakes}${s.speak_n ? ` · 🎤 ${s.speak_n}${s.speak_avg ? ` (⭐${s.speak_avg})` : ""}` : ""}${s.exam_best ? ` · 🎓 ${s.exam_best}%` : ""}</small>
+          ${s.weak.length ? `<small>⚠️ <span class="ar">${s.weak.map(esc).join("، ")}</span></small>` : ""}</div></details>`;
+    }).join("");
+    sheet(`<h3>📈 Haftalik hisobot · ${d(r.monday)}–${d(r.sunday)}</h3>
+      <div class="seg" style="margin:0"><button aria-pressed="${offset === 0}" data-wk="0">Shu hafta</button><button aria-pressed="${offset === 1}" data-wk="1">O'tgan hafta</button></div>
+      <div class="tc-stats" style="margin:0">
+        <div class="tc-stat"><b>${active.length}/${st.length}</b><small>faol</small></div>
+        <div class="tc-stat"><b>${pct(tot[0], tot[1])}</b><small>aniqlik</small></div>
+        <div class="tc-stat"><b>${tot[1]}</b><small>javob</small></div></div>
+      <div class="card" style="padding:4px 14px">
+        <div class="rep-row rep-head"><span>Talaba (bosing)</span><span>XP</span><span>kun</span><span>%</span></div>
+        ${rows || `<p class="muted">Bu haftada faollik yo'q.</p>`}</div>
+      ${idle.length ? `<details class="card tc-more" style="margin:0"><summary>😴 Kirmaganlar: ${idle.length}</summary><p>${idle.map(s => esc(s.name)).join(", ")}</p></details>` : ""}
+      ${r.hardest.length ? `<details class="card tc-more" style="margin:0"><summary>🧩 Qiynalgan mavzular: ${r.hardest.length}</summary>${r.hardest.map(h => `<div class="hard"><span class="${isAr(h.topic) ? "ar" : ""}">${esc(h.topic)}</span><b>${h.wrong}/${h.total}</b></div>`).join("")}</details>` : ""}
+      <button class="btn btn-soft btn-block" data-close>Yopish</button>`);
+    $$("[data-wk]").forEach(b => (b.onclick = () => teacherReport(+b.dataset.wk)));
+  }
+
+  async function teacherSet(open, exam, a1 = null) {
+    try { await rpc("teacher_set", { p_token: TT, p_open_lessons: open, p_exam_open: exam, p_open_a1: a1 }); toast("✅ Saqlandi"); }
+    catch (e) { toast(errText(e)); }
+    teacherLoad();
+  }
+
+  // Ustoz paroli: bir marta o'rnatiladi, keyin ilovaga «Men ustozman» orqali kiriladi
+  function passSheet() {
+    sheet(`<h3>🔑 Ustoz paroli</h3>
+      <p>Kamida 6 ta belgi. Uni hech kimga aytmang: parol bilan guruhdagi hamma talabalarni boshqarish mumkin.</p>
+      <input class="input" id="tp-1" type="password" autocomplete="new-password" placeholder="Yangi parol">
+      <input class="input" id="tp-2" type="password" autocomplete="new-password" placeholder="Parolni takrorlang">
+      <p class="auth-err" id="tp-err" hidden></p>
+      <button class="btn btn-brand btn-block" id="tp-save">Saqlash</button><button class="btn btn-soft btn-block" data-close>Bekor qilish</button>`);
+    $("#tp-save").onclick = async () => {
+      const a = $("#tp-1").value, b = $("#tp-2").value, err = m => { $("#tp-err").textContent = m; $("#tp-err").hidden = false; };
+      if (a.length < 6) return err("Parol kamida 6 ta belgidan iborat bo'lsin");
+      if (a !== b) return err("Ikkala parol bir xil emas");
+      try { await rpc("teacher_set_password", { p_token: TT, p_password: a }); closeSheet(); toast("✅ Parol saqlandi. Endi «Men ustozman» orqali kirasiz"); $("#tc-pass-card").hidden = true; }
+      catch (e) { err(errText(e)); }
+    };
+  }
+  function teacherLoginSheet() {
+    sheet(`<h3>👨‍🏫 Ustoz sifatida kirish</h3>
+      <input class="input" id="tl-code" autocapitalize="characters" placeholder="Guruh kodi: DOD_ARABIC">
+      <input class="input" id="tl-pass" type="password" autocomplete="current-password" placeholder="Ustoz paroli">
+      <p class="auth-err" id="tl-err" hidden></p>
+      <button class="btn btn-brand btn-block" id="tl-go">Kirish</button><button class="btn btn-soft btn-block" data-close>Bekor qilish</button>
+      <p style="font-size:12.5px">Parolni birinchi marta ustoz havolasi orqali kirib, ⚙️ bo'limida o'rnatasiz.</p>`);
+    $("#tl-go").onclick = async () => {
+      const err = m => { $("#tl-err").textContent = m; $("#tl-err").hidden = false; };
+      $("#tl-go").disabled = true;
+      try {
+        const r = await rpc("teacher_login", { p_code: $("#tl-code").value, p_password: $("#tl-pass").value });
+        if (r.error) return err(ERRORS[r.error] || errText(new Error(r.error)));
+        TT = r.token; store.set(K_TEACHER, TT); store.set(K_MODE, "teacher");
+        closeSheet(); $("#auth").hidden = true; startTeacher();
+      } catch (e) { err(errText(e)); }
+      finally { $("#tl-go").disabled = false; }
+    };
+  }
+  function showStudentSide() {
+    store.set(K_MODE, "student");
+    $("#teacher").hidden = true; $(".tabbar").hidden = false; $("#p-teacher").hidden = !TT;
+    if (TOKEN) { boot(); $("#auth").hidden = true; } else showAuth();
+  }
+
+  function startTeacher() {
+    store.set(K_MODE, "teacher");
+    $("#teacher").hidden = false;
+    $(".tabbar").hidden = true;
+    $("#tc-exam").onclick = () => teacherSet(null, !TC.group.exam_open);
+    $("#tc-report").onclick = () => teacherReport(0);
+    $("#tc-refresh").onclick = () => { teacherLoad(); teacherSpeakLoad(); if (!$('[data-tcp="attend"]').hidden) teacherAttLoad(); if (!$('[data-tcp="progress"]').hidden) teacherProgLoad(); if (!$('[data-tcp="journal"]').hidden) teacherJournalLoad(); };
+    $$("[data-tct]").forEach(b => (b.onclick = () => {
+      $$("[data-tct]").forEach(x => x.setAttribute("aria-pressed", x === b));
+      $$("[data-tcp]").forEach(p => (p.hidden = p.dataset.tcp !== b.dataset.tct));
+      if (b.dataset.tct === "attend") teacherAttLoad();
+      if (b.dataset.tct === "progress") teacherProgLoad();
+      if (b.dataset.tct === "journal") teacherJournalLoad();
+      window.scrollTo({ top: 0 });
+    }));
+    $$("[data-pass]").forEach(b => (b.onclick = passSheet));
+    $("#tc-as-student").onclick = showStudentSide;
+    $("#tc-logout").onclick = async () => {
+      try { await rpc("teacher_logout", { p_token: TT }); } catch { /* baribir chiqamiz */ }
+      TT = null; store.del(K_TEACHER); store.del(K_MODE);
+      showStudentSide();
+    };
+    rpc("teacher_password_status", { p_token: TT }).then(r => ($("#tc-pass-card").hidden = r.set)).catch(() => {});
+    teacherLoad();
+    teacherSpeakLoad();
+  }
+
+  // ---------- Hodisalar ----------
+  $("#m-start").onclick = startMission;
+  $("#mf-start").onclick = startFonMission;
+  $$("[data-act]").forEach(b => (b.onclick = () => {
+    const a = b.dataset.act;
+    if (a === "listen") lisPath();
+    else if (a === "review") startReview();
+    else if (a === "speak") spkPath();
+    else if (a === "duel") { duelSheet(); loadInbox().then(() => { if ($("#duel-new")) duelSheet(); }); }
+  }));
+  $("#w-hide").onclick = () => { hideMeaning = !hideMeaning; renderWords(); };
+  // Ko'rinish: 🟢 Mundil (asosiy, to'q yashil + oltin — 2026-10-17), 🌙 Qorong'u (premium) yoki ☀️ Krem. Tanlov «tb_style» da saqlanadi.
+  function applyStyle(s) {
+    document.documentElement.dataset.style = s;
+    $('meta[name="theme-color"]').content = s === "krem" ? "#1F4D3A" : s === "mundil" ? "#0B3D2E" : "#0C1218";
+    $$("[data-style-pick]").forEach(b => b.setAttribute("aria-pressed", b.dataset.stylePick === s));
+    const tb = $("#theme-tg"); if (tb) tb.textContent = s === "krem" ? "🌙" : "☀️";
+  }
+  $$("[data-style-pick]").forEach(b => (b.onclick = () => { store.set("tb_style", b.dataset.stylePick); applyStyle(b.dataset.stylePick); }));
+  applyStyle(document.documentElement.dataset.style || "mundil");
+  // ☀️/🌙 Bosh sahifadagi tezkor almashtirgich: qorong'u (premium) ↔ yorug' (krem)
+  const themeBtn = () => { const b = $("#theme-tg"); if (b) b.textContent = document.documentElement.dataset.style === "krem" ? "🌙" : "☀️"; };
+  $("#theme-tg").onclick = () => { const s = document.documentElement.dataset.style === "krem" ? "premium" : "krem"; store.set("tb_style", s); applyStyle(s); themeBtn(); };
+  themeBtn();
+  const applySfx = () => $$("[data-sfx]").forEach(b => b.setAttribute("aria-pressed", (b.dataset.sfx === "1") === sfxOn()));
+  $$("[data-sfx]").forEach(b => (b.onclick = () => { store.set("dod_sfx", b.dataset.sfx); applySfx(); sfx("ok"); }));
+  applySfx();
+  $("#p-rename").hidden = true;   // ism ro'yxatdan o'tishda beriladi, o'zgartirish ustoz orqali
+  $("#p-reset").hidden = true;
+  $("#p-logout").onclick = () => {
+    sheet(`<h3>Chiqasizmi?</h3><p>Qayta kirish uchun guruh kodi, ismingiz va PIN kerak bo'ladi. Natijalaringiz saqlanib qoladi.</p>
+      <button class="btn btn-danger btn-block" id="out-yes">Ha, chiqish</button><button class="btn btn-soft btn-block" data-close>Bekor qilish</button>`);
+    $("#out-yes").onclick = () => logout(false);
+  };
+  $$(".tab").forEach(t => (t.onclick = () => {
+    $$(".tab").forEach(x => x.removeAttribute("aria-current"));
+    t.setAttribute("aria-current", "page");
+    ["home", "today", "lessons", "top", "words", "profile"].forEach(s => ($("#screen-" + s).hidden = s !== t.dataset.tab));
+    if (t.dataset.tab === "today") { todaySel = null; renderToday(); }
+    if (t.dataset.tab === "top") renderBoard(); if (t.dataset.tab === "profile") { loadMyProgress(); loadMyAttendance(); }    window.scrollTo({ top: 0 });
+  }));
+  document.addEventListener("keydown", e => {
+    if (!run || $("#sheet-root").innerHTML || e.target.tagName === "INPUT") return;
+    const k = e.key && e.key.length === 1 ? "abcd".indexOf(e.key.toLowerCase()) : -1;
+    if (k >= 0 && run.qs[run.i] && run.qs[run.i].options && k < run.qs[run.i].options.length && run.locked !== run.i) answer(k);
+    else if (e.key === "Enter" && $("#next")) $("#next").click();
+  });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && TOKEN && $("#teacher").hidden) { loadInbox(); flushPending(); refreshMe(); } });
+  window.addEventListener("pageshow", e => { if (e.persisted && TOKEN && $("#teacher").hidden) refreshMe(); });
+
+  // ---------- Xizmat fayli (to'liq o'rnatish, tez ochilish) ----------
+  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => { /* ishlamasa ham ilova ishlayveradi */ });
+
+  // ---------- Telefonga o'rnatish ----------
+  let installPrompt = null;
+  const standalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const inTelegram = /Telegram/i.test(navigator.userAgent) || !!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData);
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  // ---------- 🔔 Telefon bildirishnomalari (olov eslatmasi, har kuni 20:00 — faqat missiya bajarilmagan bo'lsa) ----------
+  const VAPID_PUBLIC = "BPFgzDNzYes7VPQFm0d405ukhTr_BnNur1Y4KZ0sIbTuCl6e2mpIm4bmw6IsPOEnlrnsKrmXcxNaLhB93OCmDTM";
+  const pushSupported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  const pushOn = () => pushSupported() && Notification.permission === "granted" && store.get("tb_push") === "1";
+  const b64u8 = s => { const p = "=".repeat((4 - s.length % 4) % 4), b = atob((s + p).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(b, ch => ch.charCodeAt(0)); };
+  async function pushEnable() {
+    if (!pushSupported()) return toast(isIOS && !standalone() ? "📲 iPhone'da avval ilovani ekranga qo'shing (Ulashish → «На экран «Домой»»), keyin shu yerdan yoqing" : "Bu brauzer bildirishnomani qo'llamaydi. Chrome'da oching");
+    let perm;
+    try { perm = await Notification.requestPermission(); } catch { perm = "denied"; }
+    if (perm !== "granted") return toast("🔕 Ruxsat berilmadi. Telefon sozlamalaridan bildirishnomaga ruxsat bering");
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u8(VAPID_PUBLIC) });
+      const j = sub.toJSON();
+      await rpc("push_subscribe", { p_token: TOKEN, p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth });
+      store.set("tb_push", "1"); renderPushCard();
+      toast("🔔 Eslatma yoqildi! Missiyani unutsangiz, kechqurun 20:00 da eslatamiz 😊");
+    } catch (e) { toast("Eslatmani yoqib bo'lmadi. Keyinroq qayta urinib ko'ring"); }
+  }
+  async function pushDisable() {
+    try {
+      const reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription();
+      if (sub) { rpc("push_unsubscribe", { p_token: TOKEN, p_endpoint: sub.endpoint }).catch(() => {}); await sub.unsubscribe(); }
+    } catch { /* */ }
+    store.set("tb_push", "0"); renderPushCard(); toast("🔕 Eslatma o'chirildi");
+  }
+  function renderPushCard() {
+    const box = $("#push-card"); if (!box) return;
+    const on = pushOn();
+    box.innerHTML = `<b>🔔 Olov eslatmasi</b><small class="muted" style="display:block;margin:-2px 0 6px">Missiyani unutsangiz, har kuni 20:00 da telefoningizga eslatma keladi</small>
+      <button class="btn ${on ? "btn-soft" : "btn-brand"} btn-block" id="push-btn">${on ? "✅ Yoqilgan · o'chirish" : "🔔 Eslatmani yoqish"}</button>`;
+    $("#push-btn").onclick = () => (on ? pushDisable() : pushEnable());
+  }
+  renderPushCard();
+  function showInstallCard() {
+    const hidden = standalone() || inTelegram || store.get("dod_install_hide") === "1";
+    $("#install").hidden = hidden;
+  }
+  window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installPrompt = e; showInstallCard(); });
+  window.addEventListener("appinstalled", () => { $("#install").hidden = true; toast("🎉 Mundil.uz telefoningizga o'rnatildi!"); });
+  $("#install").onclick = async () => {
+    if (installPrompt) {
+      installPrompt.prompt();
+      const r = await installPrompt.userChoice.catch(() => null);
+      installPrompt = null;
+      if (r && r.outcome === "accepted") $("#install").hidden = true;
+      return;
+    }
+    sheet(`<h3>📲 Telefonga o'rnatish</h3>
+      ${isIOS ? `<ol class="steps"><li><b>Safari</b> brauzerida oching (boshqa brauzerda bu ishlamaydi).</li>
+        <li>Pastdagi <b>Ulashish</b> tugmasini bosing (kvadrat va yuqoriga strelka ⬆️).</li>
+        <li>Ro'yxatdan <b>«На экран Домой»</b> (Add to Home Screen) ni tanlang.</li>
+        <li>O'ng yuqoridagi <b>Добавить</b> (Add) ni bosing.</li></ol>`
+      : `<ol class="steps"><li><b>Chrome</b> brauzerida oching.</li>
+        <li>O'ng yuqoridagi <b>⋮</b> (uch nuqta) tugmasini bosing.</li>
+        <li><b>«Установить приложение»</b> yoki <b>«Добавить на главный экран»</b> ni tanlang.</li>
+        <li><b>Установить</b> ni bosing.</li></ol>`}
+      <p>Shundan keyin telefoningiz ekranida <b style="color:var(--ink)">Mundil.uz</b> ikonkasi paydo bo'ladi.</p>
+      <button class="btn btn-brand btn-block" data-close>Tushunarli</button>
+      <button class="btn btn-soft btn-block" id="install-hide">Boshqa ko'rsatmang</button>`);
+    $("#install-hide").onclick = () => { store.set("dod_install_hide", "1"); closeSheet(); showInstallCard(); };
+  };
+  showInstallCard();
+
+  // ---------- 🌙 Fonetika: «Yulduzlar yo'li» (Mundil.uz; «Savodim» kitobi asosida; ustoz, 2026-10-12) ----------
+  // Har harf — osmondagi bitta yulduz (kitobdagi tartibda). Harfning barcha qadamlari bajarilsa, yulduz yonadi.
+  // Bu yerda ball, soat va reyting yo'q (ustoz qarori). Ma'lumot: content/fonetika/harflar.json → python build_fon.py
+  const FON = /*FON_DATA*/{"tartib":"ارزمتنيبكلوهفقشسثصطجخحغعدضذظ","harflar":[{"char":"ا","name":"Alif","joy":"tomoq","maxraj":"Halqumda.","tip":"Arab tilida a, i, u unlilari harf bilan emas, kichik belgilar — harakatlar bilan yoziladi.","harakat":true,"syll":["اَ","اِ","اُ"],"words":[],"join":[]},{"char":"ر","name":"Ro","joy":"tish","maxraj":"Tilning oldi qismi ro'parasidagi yuqori tanglayga (qaynoq suv ichganda kuyadigan joy) tekkanda chiqadi.","tip":"Ro harfida yengil titroq bor. Lekin «traktorrrr» degandek qattiq titratib yubormang.","sifat":[1,0,0,0],"special":"Biroz titroq — takrir, burilish — inxirof","syll":["رَ","رِ","رُ"],"words":["اَرْ","اِرْ","اُرْ"],"join":[["اَ","رْ"],["اِ","رْ"],["اُ","رْ"]]},{"char":"ز","name":"Za","joy":"tish","maxraj":"Tilning uchi pastki old tishlarning ichki qismiga tekkanda chiqadi.","tip":"Za harfida hushtakka o'xshash ovoz bor: «zzz» deb cho'zib ko'ring.","sifat":[2,0,0,0],"special":"Hushtaksimon — sofir","syll":["زَ","زِ","زُ"],"words":["اَزْ","اِزْ","اُزْ","زَرْ","زِرْ","زُرْ","اَزْرُ","اِزْرُ","اُرْزُ"],"join":[["اَ","زْ"],["زَ","رُ"],["اِ","زْ","رُ"],["اُ","رْ","زُ"]]},{"char":"م","name":"Mim","joy":"lab","maxraj":"Ikki lab bir-biriga tekkanda, ya'ni yopilganda chiqadi.","tip":"Mim aytilganda ovoz burundan chiqadi. Burningizni qisib ko'ring — ovoz to'xtab qoladi.","sifat":[1,0,0,0],"special":"Burundan chiqadigan tovush — g'unna","syll":["مَ","مِ","مُ"],"words":["اَمْ","اِمْ","اُمْ","مُرْ","مُزْ","رُمْ","اَمَرَ","اُمِرَ","اَمْرُ","رَمْزُ","مَرْمَرْ","زَمْزَمْ"],"join":[["اَ","مَ","رَ"],["رَ","مْ","زُ"],["مَ","رْ","مَ","رْ"],["زَ","مْ","زَ","مْ"]]},{"char":"ت","name":"Ta","joy":"tish","maxraj":"Tilning uchi yuqori old tishlarning milkiga tutashgan ichki qismiga tekkanda chiqadi.","tip":"Kaftingizni og'zingizga yaqin tuting: Ta aytganda havo kaftingizga urilsa — bu jarangsiz (hams) harf.","sifat":[0,1,0,0],"syll":["تَ","تِ","تُ"],"words":["مَتْ","مِتْ","مُتْ","زُرْتَ","اَمَرْتِ","مَرَرْتُ","اُمِرْتُ","اَمَرَتْ","اَمَرْتُمْ","مَرَرْتُمْ"],"join":[["تَ","مْ","رُ"],["تَ","رِ","مُ"],["تَ","زِ","رُ"],["اَ","مَ","رَ","تْ"],["اُ","مِ","رْ","تُ","مْ"]]},{"char":"ن","name":"Nun","joy":"tish","maxraj":"Tilning uchi yuqori old tishlar milkining ichki qismiga tekkanda chiqadi.","tip":"Nun ham Mim kabi g'unnali harf: ovoz burundan chiqadi.","sifat":[1,0,0,0],"special":"Burundan chiqadigan tovush — g'unna","syll":["نَ","نِ","نُ"],"words":["اَنْ","اِنْ","زِنْ","مَنْ","مِنْ","نَمْ","اَنْتَ","نِمْتَ","اَنْتُمْ","نَزِنُ","اَمَرْنَ"],"join":[["مِ","نْ"],["اَ","نْ","تَ"],["اَ","نْ","تُ","مْ"],["نَ","مْ","نَ","مَ"]]},{"char":"ي","name":"Ya","joy":"til o'rtasi","maxraj":"Tilning o'rta qismi ro'parasidagi yuqori tanglayga ko'tarilganda chiqadi.","tip":"Ya sirg'aluvchi va yumshoq (lin) harf: tovush to'silmay, erkin oqib chiqadi.","sifat":[2,0,0,0],"special":"Yumshoq — lin","syll":["يَ","يِ","يُ"],"words":["اَيْ","اَيْمُ","زَيْتُ","مَيْتُ","رَمْيُ","يَمَنْ","مَرْيَمْ","اَيْمَنْ","اَمْرَيْنِ","زَيْتَيْنِ"],"join":[["اَ","يْ","نَ"],["زَ","يْ","نُ"],["زَ","يْ","تُ"],["يَ","مَ","نُ"],["يَ","زِ","نُ"]]},{"char":"ب","name":"Ba","joy":"lab","maxraj":"Ikki lab bir-biriga tekkanda, ya'ni yopilganda chiqadi.","tip":"Ba sukunli kelsa, tovush biroz tebranib «otilib» chiqadi — bu qalqala.","sifat":[0,0,0,0],"special":"Tebranish — qalqala","syll":["بَ","بِ","بُ"],"words":["اَبْ","اِبْنُ","بِنْتُ","بَيْتُ","بَيْنُ","رَيْبُ","زَيْنَبْ","بَرْبَرْ","مِنْبَرْ","بِبَيْتَيْنِ"],"join":[["بَ","يْ","تُ"],["بِ","نْ","تُ"],["رَ","يْ","بُ"],["نَ","بَ","تَ"]]},{"char":"ك","name":"Kaf","joy":"til orqasi","maxraj":"Tilning orqa qismi yuqori qattiq va yumshoq tanglayning kesishgan joyiga tekkanda chiqadi.","tip":"Kaf portlovchi va jarangsiz: tovush birdan chiqadi, kaftingizga havo urilishini sezasiz.","sifat":[0,1,0,0],"syll":["كَ","كِ","كُ"],"words":["كَمْ","كُنْ","كَيْ","بَكْرُ","كَنْزُ","تَرْكُ","كَتَبَ","يَكْتُبُ","تَرَكَ","كُنْتُ","مُمْكِنْ"],"join":[["كَ","تَ","بَ"],["كُ","نْ","تُ"],["رَ","كِ","بَ"],["يَ","رْ","كَ","بُ"]]},{"char":"ل","name":"Lam","joy":"tish","maxraj":"Tilning oldi qismi yuqori old tishlar milki va tanglay tutashgan joyiga yoyilib tekkanda chiqadi.","tip":"Lamda tilning oldi qismi yoyilib tegadi; tovush biroz cho'ziladi (oraliq harf).","sifat":[1,0,0,0],"special":"Burilish — inxirof","syll":["لَ","لِ","لُ"],"words":["اَلْ","بَلْ","لَمْ","لَنْ","كِلْ","نَزَلَ","لَزِمَ","كَمُلَ","اَكَلَتْ","اَكَلْتُ","بُلْبُلْ"],"join":[["لَ","بَ","نُ"],["لَ","يْ","لُ"],["نَ","مْ","لُ"],["يَ","لْ","زَ","مُ"]]},{"char":"و","name":"Vov","joy":"lab","maxraj":"Ikki lab orasini ochib cho'chchaytirganda va til orqasi biroz ko'tarilganda chiqadi.","tip":"Vov aytganda lablar xuddi atirgul g'unchasiday dumaloq bo'ladi.","sifat":[2,0,0,0],"special":"Yumshoq — lin","syll":["وَ","وِ","وُ"],"words":["اَوْ","لَوْ","وَرَمْ","وَتَرْ","وَمَنْ","وَكَمْ","يَوْمُ","كَوْنُ","وَزْنُ","كَوْكَبْ","مَوْكِبْ"],"join":[["وَ","زَ","نَ"],["يَ","وْ","مُ"],["نَ","وْ","مُ"],["مَ","وْ","زُ"],["لَ","وْ","نُ"],["يَ","زِ","نُ"]]},{"char":"ه","name":"Ha (ه)","joy":"tomoq","maxraj":"Halqumning quyi qismidan chiqadi.","tip":"Ha (ه) jarangsiz va sirg'aluvchi: tomoqning eng pastidan yengil nafas bilan ayting.","sifat":[2,1,0,0],"syll":["هَ","هِ","هُ"],"words":["هَبْ","هَمْ","هَلْ","هُوَ","هِيَ","هُمْ","وَهَبْ","لَهَبْ","بِهِمْ","مِنْهُ","مِنْهُمْ"],"join":[["هَ","رَ","بَ"],["هَ","لْ"],["هُ","وَ"],["هِ","يَ"],["هُ","مْ"],["يَ","هْ","رُ","بُ"]]},{"char":"ف","name":"Fa","joy":"lab","maxraj":"Pastki labning o'rta qismi yuqori tishlarning uchiga tekkanda chiqadi.","tip":"Pastki labni yuqori tishlar uchiga yengil tekkizing; Fa jarangsiz, havo kaftingizga urilib chiqadi.","sifat":[2,1,0,0],"syll":["فَ","فِ","فُ"],"words":["فَمْ","فَنْ","كَفْ","فَلَكْ","كَفَنْ","نَفَرْ","فَوْزُ","فَهْمُ","فِكْرُ","فُلْفُلْ","فَهِمَ","يَفْهَمُ"],"join":[["فَ","هِ","مَ"],["فَ","وْ","زُ"],["فِ","كْ","رُ"],["يَ","فْ","هَ","مُ"],["اِ","فْ","هَ","مْ"]]},{"char":"ق","name":"Qof","joy":"til orqasi","maxraj":"Tilning orqa qismi yuqori yumshoq tanglayga tekkanda chiqadi.","tip":"Qof yo'g'on harf, Kafdan orqaroqda — yumshoq tanglayda chiqadi. كَمَرْ va قَمَرْ ni farqlab o'qing.","sifat":[0,0,1,0],"special":"Tebranish — qalqala","syll":["قَ","قِ","قُ"],"words":["زُقْ","قُمْ","قِفْ","قَلْبُ","قَبْلُ","فَوْقُ","قَلَمْ","قَمَرْ","لَقَبْ","فَلَقْ","فَرْقُ"],"join":[["قَ","بْ","لَ"],["قَ","لَ","مُ"],["وَ","قَ","فَ"],["رَ","زَ","قَ"],["نَ","قَ","لَ"]]},{"char":"ش","name":"Shin","joy":"til o'rtasi","maxraj":"Tilning o'rta qismi yuqori tanglayga ko'tarilganda chiqadi.","tip":"Shinda havo og'iz ichida yoyilib chiqadi — bu yoyilish (tafashshiy) sifati.","sifat":[2,1,0,0],"special":"Yoyilish — tafashshiy","syll":["شَ","شِ","شُ"],"words":["رَشْ","شَرْ","شَمْ","بِشْرُ","شَرِبَ","شَهْرُ","نَشْرُ","شُكْرُ","مَشْرَبْ","مَشْرِقْ"],"join":[["شَ","رِ","بَ"],["شَ","كَ","رَ"],["نَ","شَ","رَ"],["فَ","شَ","لَ"],["يَ","شْ","رَ","بُ"],["شَ","هْ","رُ"]]},{"char":"س","name":"Sin","joy":"tish","maxraj":"Tilning uchi pastki old tishlarning ichki qismi ostiga tekkanda chiqadi.","tip":"Sinni aytganda lablaringizni biroz yoyib, tabassum qiling — harf ingichka va chiroyli chiqadi.","sifat":[2,1,0,0],"special":"Hushtaksimon — sofir","syll":["سَ","سِ","سُ"],"words":["بَسْ","سَمْ","سِرْ","سِنْ","سَفَرْ","سَبَقْ","سَمَكْ","فَرَسْ","مَسْكَنْ","مُسْلِمْ","سِمْسِمْ"],"join":[["سَ","كَ","نَ"],["سَ","فَ","رَ"],["لَ","بِ","سَ"],["كَ","سَ","بَ"],["نَ","فْ","سُ"],["شَ","مْ","سُ"]]},{"char":"ث","name":"Sa","joy":"tish","maxraj":"Tilning uchi tepa tishning uchi bilan tengma-teng turganda chiqadi.","tip":"Tilni yuqori tishlar uchiga shunchaki tekkizing, qattiq tishlamang. Hushtak chiqsa, til uchini yuqoriga ko'taring.","sifat":[2,1,0,0],"syll":["ثَ","ثِ","ثُ"],"words":["بَثْ","ثَمْ","ثَمَرْ","ثَمَنْ","ثَوْرُ","ثَوْبُ","مِثْلُ","مَثَلْ","كَوْثَرْ","اَكْثَرَ","ثَبْتُ"],"join":[["ثَ","بَ","تَ"],["ثَ","قُ","لَ"],["ثَ","مَ","نُ"],["وَ","رِ","ثَ"],["مَ","ثَ","لُ"],["ثَ","مَ","رُ"]]},{"char":"ص","name":"Sod","joy":"tish","maxraj":"Tilning uchi pastki old tishlarning ichki qismiga tekkanda va til orqasi ko'tarilganda chiqadi.","tip":"Sodni yo'g'on aytaman deb lablarni cho'chchaytirmang — yo'g'onlik faqat til orqasi ko'tarilishidan bo'lsin.","sifat":[2,1,1,1],"special":"Hushtaksimon — sofir","syll":["صَ","صِ","صُ"],"words":["صُمْ","صِفْ","صَرَفْ","صَبَرْ","بَصَرْ","قَصَبْ","نَصَرَ","يَنْصُرُ","صَفَرْ","صَيْفُ"],"join":[["صَ","بَ","رَ"],["نَ","صَ","رَ"],["فَ","صَ","لَ"],["وَ","صَ","لَ"],["صَ","يْ","فُ"],["قَ","صَ","بْ"]]},{"char":"ط","name":"To","joy":"tish","maxraj":"Tilning uchi yuqori old tishlarning ichki qismiga tekkanda va til orqasi ko'tarilganda chiqadi.","tip":"To Tadan jarangli va yo'g'onligi bilan farq qiladi. تَرَفْ va طَرَفْ ni farqlab o'qing.","sifat":[0,0,1,1],"special":"Tebranish — qalqala","syll":["طَ","طِ","طُ"],"words":["طَلْ","قَطْ","فَقَطْ","وَطَنْ","طَلَبْ","طَرَفْ","طِفْلُ","مَطَرْ","مَطْلَبْ","مَوْطِنْ","سَبْطُ"],"join":[["طَ","لَ","بَ"],["طَ","يْ","رُ"],["طِ","فْ","لُ"],["رَ","بَ","طَ"],["سَ","قَ","طَ"],["مَ","طَ","رْ"]]},{"char":"ج","name":"Jim","joy":"til o'rtasi","maxraj":"Tilning o'rta qismi ro'parasidagi yuqori tanglayga tekkanda chiqadi.","tip":"Jimni jarangsiz «ch» yoki ruscha «J» kabi sirg'atib aytmang — u portlovchi va qalqalali harf.","sifat":[0,0,0,0],"special":"Tebranish — qalqala","syll":["جَ","جِ","جُ"],"words":["جَمْ","جَرْ","جِنْ","جَبْ","جَبَلْ","جَمَلْ","اَجْرُ","فَجْرُ","جَوْهَرْ","جَوْرَبْ"],"join":[["جَ","لَ","سَ"],["جِ","سْ","مُ"],["فَ","جَ","رَ"],["جَ","بَ","لُ"],["وَ","جْ","هُ"],["ثَ","لْ","جُ"]]},{"char":"خ","name":"Xo","joy":"tomoq","maxraj":"Halqumning yuqori qismidan chiqadi.","tip":"Xo tomoqning yuqori qismidan chiqadi va yo'g'on o'qiladi; havo to'silmay oqadi.","sifat":[2,1,1,0],"syll":["خَ","خِ","خُ"],"words":["خَبْ","خَلْ","خَرَجْ","خَبَرْ","خَشَبْ","خَلَفْ","خَيْرُ","خَتْمُ","خَوْفُ","مَخْرَجْ"],"join":[["خَ","رَ","جَ"],["خَ","لَ","قَ"],["خَ","يْ","رُ"],["خُ","بْ","زُ"],["طَ","بَ","خَ"],["مَ","طْ","بَ","خُ"]]},{"char":"ح","name":"Ha (ح)","joy":"tomoq","maxraj":"Halqumning o'rta qismidan chiqadi.","tip":"Kaftingizni og'zingizga yaqin tutib «ahh» deng: iliq havo urilsa — to'g'ri. «x»ga o'xshab xirillasa, tomoq o'rtasiga tushing.","sifat":[2,1,0,0],"syll":["حَ","حِ","حُ"],"words":["حَيْ","حِلْ","حَجْ","حَسَنْ","حَسَبْ","مُحْسِنْ","مَحْفَلْ","اَحْسَنَ","حَلْقُ","حَتْمُ"],"join":[["بَ","حْ","رُ"],["لَ","حْ","مُ"],["فَ","تَ","حَ"],["مَ","سَ","حَ"],["نَ","جَ","حَ"],["شَ","رَ","حَ"]]},{"char":"غ","name":"G'oyn","joy":"tomoq","maxraj":"Halqumning yuqori qismidan chiqadi.","tip":"G'oyn Xo bilan bir joydan chiqadi, lekin jarangli: ovoz paychalari titraydi.","sifat":[2,0,1,0],"syll":["غَ","غِ","غُ"],"words":["غَمْ","غَبْ","غِلْ","غَيْرُ","بَغْلُ","فَرْغُ","غَبْغَبْ","مَبْلَغْ","مَغْرِبْ","اِغْفِرْ"],"join":[["غَ","سَ","لَ"],["غَ","لَ","بَ"],["غَ","رِ","قَ"],["بَ","لَ","غَ"],["شَ","غَ","لَ"],["فَ","رْ","غُ"]]},{"char":"ع","name":"Ayn","joy":"tomoq","maxraj":"Halqumning o'rta qismidan chiqadi.","tip":"Ayn — bu «A» emas: tomoq o'rtasidagi mushaklar havoni mayin qisadi, xuddi to'r ichidan qisilib o'tgan to'p kabi.","sifat":[1,0,0,0],"syll":["عَ","عِ","عُ"],"words":["بِعْ","عَنْ","عَمْ","مَعَ","عَرَبَ","عَجَبْ","عَمَلْ","عِلْمُ","عُمْرُ","جَمْعُ","عَيْنُ","بَعْلُ"],"join":[["عَ","لِ","مَ"],["عَ","مَ","لَ"],["عَ","رَ","فَ"],["عَ","يْ","نُ"],["سَ","مِ","عَ"],["يَ","عْ","لَ","مُ"]]},{"char":"د","name":"Dal","joy":"tish","maxraj":"Tilning uchi yuqori old tishlarning milki bilan tutashgan ichki qismiga tekkanda chiqadi.","tip":"Dal portlovchi harf: sukunli kelsa, qalqala bilan biroz tebranib chiqadi — اُشْدُدْ.","sifat":[0,0,0,0],"special":"Tebranish — qalqala","syll":["دَ","دِ","دُ"],"words":["دُمْ","دُفْ","زِدْ","دَرْسُ","دَفْعُ","دَهْرُ","دُهْنُ","دُلْدُلْ","هُدْهُدْ","اُشْدُدْ"],"join":[["دَ","خَ","لَ"],["دَ","رَ","سَ"],["وَ","لَ","دَ"],["بَ","دْ","رُ"],["وَ","رَ","دَ"],["اَ","دْ","رَ","كَ"]]},{"char":"ض","name":"Dod","joy":"tish","maxraj":"Tilning ikki yoni yoki bir yoni yuqori jag' tishlarining ichki devoriga qattiq, til uchi yuqori old tishlarning ichki qismiga yengil tekkanda va til orqasi ko'tarilganda chiqadi.","tip":"Dod sirg'aluvchi, yo'g'on va yopiq; Dalda esa bu sifatlarning ziddi bor. دَرْسُ va ضَرْسُ ni farqlab o'qing.","sifat":[2,0,1,1],"special":"Cho'zilgan — iste'tola","syll":["ضَ","ضِ","ضُ"],"words":["ضَيْفُ","عَضْلُ","ضَبْطُ","ضَعْفُ","عَرْضُ","مَضْرِبْ","اِضْرِبْ","تَضْرِبُ","ضَرْسُ","بَعْضُ"],"join":[["ضَ","حِ","كَ"],["ضَ","عُ","فَ"],["حَ","ضَ","رَ"],["غَ","ضَ","بَ"],["مَ","رِ","ضَ"],["عَ","رَ","ضَ"]]},{"char":"ذ","name":"Zal","joy":"tish","maxraj":"Tilning uchi tepa tishning uchi bilan tengma-teng turganda chiqadi.","tip":"Zalni aytganda tilingizni qattiq tishlamang, aks holda «d» tovushiga o'xshab qoladi.","sifat":[2,0,0,0],"syll":["ذَ","ذِ","ذُ"],"words":["اِذْ","مُذْ","خُذْ","مُنْذُ","اِذْنُ","ذِكْرُ","ذِهْنُ","ذَهَبْ","مَذْهَبْ","بَذَلَ","ذِفْرُ"],"join":[["ذَ","هَ","بَ"],["ذَ","نَ","بُ"],["ذِ","كْ","رُ"],["اَ","خَ","ذَ"],["مُ","نْ","ذُ"],["بَ","ذَ","لَ"]]},{"char":"ظ","name":"Zo","joy":"tish","maxraj":"Tilning uchi tepa tishning uchi bilan tengma-teng turganda va til orqasi ko'tarilganda chiqadi.","tip":"Zo Zal bilan bir joydan chiqadi, lekin yo'g'on va yopiq: aytganda til orqasini ko'taring.","sifat":[2,0,1,1],"syll":["ظَ","ظِ","ظُ"],"words":["ظِلْ","ظَنْ","حَظْ","ظَفَرْ","نَظَرْ","نَظْمُ","ظُهْرُ","ظُلْمُ","مُظْلِمْ","مَنْظَرْ","اَعْظَمْ"],"join":[["ظَ","هَ","رَ"],["ظَ","رْ","فُ"],["نَ","ظَ","رَ"],["حَ","فِ","ظَ"],["يَ","ظْ","لِ","مُ"],["لَ","فَ","ظَ"]]}]}/*FON_END*/;
+  const FON_STEPS = [["meet", "👋", "Tanishuv"], ["sifat", "🧩", "Sifatlari"], ["listen", "🎧", "Tinglab top"], ["read", "📖", "O'qish"], ["join", "🔗", "Yig'ish"], ["write", "✍️", "Yozish"]];
+  const FON_SIFAT = [
+    ["Tovush qanday chiqadi?", [["Portlovchi", "shidda", "cho'zib bo'lmaydi"], ["Oraliq", "bayniya", "biroz cho'ziladi"], ["Sirg'aluvchi", "rohova", "cho'ziladi"]]],
+    ["Jaranglimi?", [["Jarangli", "jahr", "tovush paychalari titraydi"], ["Jarangsiz", "hams", "nafas kaftga uriladi"]]],
+    ["Ingichkami, yo'g'onmi?", [["Ingichka", "iste'fola", "til pastda turadi"], ["Yo'g'on", "iste'lo", "til orqasi ko'tariladi"]]],
+    ["Ochiqmi, yopiqmi?", [["Ochiq", "infitoh", "til tanglaydan ajralgan"], ["Yopiq", "itboq", "til tanglayga yopishadi"]]],
+  ];
+  const FON_HARAKAT = [["اَ", "Fatha", "a", "ustidagi chiziqcha: «baland» = b‑l‑n‑d"], ["اِ", "Kasra", "i", "ostidagi chiziqcha: «bilim» = b‑l‑m"], ["اُ", "Zamma", "u", "ustidagi vergulcha: «bulut» = b‑l‑t"], ["اْ", "Sukun", "unlisiz", "doiracha: tovush yo'q, keyingi harfga o'tiladi"]];
+  const NOJOIN = "اأإآدذرزو";   // o'zidan keyingi harfga ulanmaydigan harflar
+  const fonFile = t => "audio/f_" + Array.from(t).map(c => c.codePointAt(0).toString(16)).join("") + ".mp3";
+  function fonPlay(t) { try { if (player) player.pause(); playSeq.id = (playSeq.id || 0) + 1; player = new Audio(fonFile(t)); player.play().catch(() => { /* ovozsiz davom */ }); } catch { /* */ } }
+  const fonGot = ch => ((S.fon || {})[ch] || []);
+  const fonStepsOf = h => FON_STEPS.filter(([k]) => (k === "sifat" ? h.sifat || h.harakat : k === "read" ? h.words.length : k === "join" ? h.join.length : true));
+  const fonComplete = h => fonStepsOf(h).every(([k]) => fonGot(h.char).includes(k));
+  const fonOpen = i => i < FON.harflar.length && (i === 0 || fonComplete(FON.harflar[i - 1]));
+  const FON_AUDIO = new Set(FON.harflar.flatMap(h => [...h.syll, ...h.words]));
+
+  // 🌙 Fonetika missiyasi: har o'quvchiga o'zi o'tgan harflaridan (+ hozir o'rganayotgani; kamida 2 ta harf), 12 savol:
+  // 🎧 tinglab top ×3 · 🧩 sifat ×3 · 📍 maxraj ×3 · 🔗 yig'ish ×3. Har savolga 15 soniya (ustoz, 2026-10-17)
+  const FON_JOY = [["lab", "👄 Lablar"], ["tish", "🦷 Til uchi va tishlar"], ["til o'rtasi", "👅 Tilning o'rtasi"], ["til orqasi", "👅 Tilning orqasi"], ["tomoq", "🗣 Tomoq"]];
+  function fonMissionQs() {
+    let cur = FON.harflar.findIndex(h => !fonComplete(h)); if (cur < 0) cur = FON.harflar.length - 1;
+    const pool = FON.harflar.slice(0, Math.max(2, cur + 1)), texts = [...new Set(pool.flatMap(h => [...h.syll, ...h.words]))];
+    const opts3 = (t, from) => { const o = shuffle([t, ...shuffle([...new Set(from)].filter(x => x !== t)).slice(0, 2)]); return [o, o.indexOf(t)]; };
+    const qs = [], seen = new Set(), add = q => { if (q && !seen.has(q.key)) { seen.add(q.key); qs.push(q); return true; } return false; };
+    const many = (fn, n) => { for (let k = 0, t = 0; k < n && t < 40; t++) if (add(fn())) k++; };
+    many(() => { const t = pick(texts); return Q("f_lis", "listening", t, "🎧 Eshiting. Nima aytildi?", opts3(t, texts), { audio: t, hint: `Aytilgani: ${t}` }); }, 3);
+    const withS = pool.filter(h => h.sifat);
+    many(() => { const h = pick(withS), r = rnd(4), [q, os] = FON_SIFAT[r], names = os.map(([uz, ar]) => `${uz} (${ar})`);
+      return Q("f_sif", "reading", h.char + r, `<b>${h.char}</b>\n\n«${h.name}» harfi: ${q}`, [names, h.sifat[r]], { hint: `${h.name}: ${names[h.sifat[r]]}` }); }, 3);
+    const withJ = pool.filter(h => h.joy);
+    many(() => { const h = pick(withJ), right = FON_JOY.find(j => j[0] === h.joy), o = shuffle([right, ...shuffle(FON_JOY.filter(j => j !== right)).slice(0, 3)]);
+      return Q("f_max", "reading", h.char + "#" + qs.length, `<b>${h.char}</b>\n\nBu harf qayerdan chiqadi?`, [o.map(j => j[1]), o.indexOf(right)], { hint: `${h.name}: ${h.maxraj}` }); }, 3);
+    const joins = pool.flatMap(h => h.join.map(p => [p, h]));
+    many(() => { if (!joins.length) return null; const [parts] = pick(joins), t = parts.join("");
+      return Q("f_join", "grammar", t, `<b>${parts.join(" + ")}</b>\n\nQo'shilsa qaysi so'z chiqadi?`, opts3(t, [...texts, ...joins.map(([p]) => p.join(""))]), { audio: t }); }, 3);
+    many(() => { const t = pick(texts); return Q("f_lis", "listening", t, "🎧 Eshiting. Nima aytildi?", opts3(t, texts), { audio: t, hint: `Aytilgani: ${t}` }); }, 12 - qs.length);
+    return qs;
+  }
+  function startFonMission() { startRun("fonmission", fonMissionQs()); }
+
+  function renderFon() {
+    const box = $("#fon-sky"); if (!box) return;
+    const order = Array.from(FON.tartib), lit = FON.harflar.filter(fonComplete).length;
+    box.innerHTML = `<div class="fs-head"><b>Yulduzlar yo'li</b><span>${lit}/${order.length} yulduz yondi</span></div>
+      <p class="fs-note">Har bir harf — bitta yulduz. Harfni o'rganing — yulduz yonadi ✨</p>
+      <div class="fs-grid">${order.map((ch, i) => { const h = FON.harflar[i], st = !h ? "soon" : fonComplete(h) ? "done" : fonOpen(i) ? "open" : "locked";
+        return `<button class="fs-star ${st}" data-fi="${i}" aria-label="${h ? esc(h.name) + " harfi" : "tez orada"}"><span class="ar">${ch}</span><small>${st === "done" ? "★" : st === "open" ? "boshlash" : st === "locked" ? "🔒" : "•"}</small></button>`; }).join("")}</div>
+      <p class="fs-note">«Savodim» kitobi asosida · hozircha birinchi ${FON.harflar.length} ta harf ochiq</p>`;
+    $$("[data-fi]").forEach(b => (b.onclick = () => { const i = +b.dataset.fi, h = FON.harflar[i];
+      if (!h) return toast("✨ Bu yulduz tez orada ochiladi");
+      if (!fonOpen(i)) return toast(`🔒 Avval «${FON.harflar[i - 1].name}» harfi yulduzini yoqing`);
+      sfx("tap"); fonLetter(i); }));
+  }
+
+  let fonCur = null;   // { i, k } — ochiq harf va qadam
+  function closeFon() { if (player) player.pause(); fonCur = null; $("#fon").hidden = true; document.body.style.overflow = ""; renderFon(); }
+  function fonLetter(i, k) {
+    const h = FON.harflar[i], steps = fonStepsOf(h);
+    if (k == null) { k = steps.findIndex(([key]) => !fonGot(h.char).includes(key)); if (k < 0) k = 0; }
+    fonCur = { i, k }; $("#fon").hidden = false; document.body.style.overflow = "hidden"; syncBack();
+    const [key, ic, title] = steps[k];
+    $("#fon-in").innerHTML = `<div class="fn-top"><button class="fn-x" id="fn-x" aria-label="Yopish">✕</button><b>${esc(h.name)} harfi</b><span class="ar">${h.char}</span></div>
+      <div class="fn-steps">${steps.map(([sk, sic], j) => `<i class="${fonGot(h.char).includes(sk) ? "on" : ""} ${j === k ? "cur" : ""}">${sic}</i>`).join("")}</div>
+      <h3 class="fn-title">${ic} ${title}</h3><div id="fn-body"></div>
+      <button class="fn-next" id="fn-next" disabled>Davom etish →</button>`;
+    $("#fn-x").onclick = closeFon; $("#fon").scrollTop = 0;
+    const ok = () => { const b = $("#fn-next"); if (b && b.disabled) { b.disabled = false; sfx("ok"); } };
+    $("#fn-next").onclick = () => {
+      const was = fonComplete(h);
+      S.fon = S.fon || {}; const a = (S.fon[h.char] = S.fon[h.char] || []); if (!a.includes(key)) a.push(key);
+      saveResult(0, 0, "fon", []);
+      if (k + 1 < steps.length) return fonLetter(i, k + 1);
+      fonFinish(i, !was);
+    };
+    FON_STEP[key](h, $("#fn-body"), ok, i);
+  }
+  function fonFinish(i, fresh) {
+    const h = FON.harflar[i], next = FON.harflar[i + 1];
+    sfx("win");
+    $("#fon-in").innerHTML = `<div class="fn-done"><div class="fn-bigstar">★</div><div class="ar fn-bigletter">${h.char}</div>
+      <h3>${fresh ? "Yulduz yondi!" : "Yana bir bor mustahkamlandi!"}</h3><p>«${esc(h.name)}» harfini o'rgandingiz. Barakalla! 🌙</p>
+      ${next ? `<button class="fn-next" id="fn-go">Keyingi yulduz: ${esc(next.name)} →</button>` : `<p class="fs-note">Keyingi harflar tez orada qo'shiladi 🐪</p>`}
+      <button class="fn-ghost" id="fn-sky">Osmonga qaytish</button></div>`;
+    const go = $("#fn-go"); if (go) go.onclick = () => fonLetter(i + 1);
+    $("#fn-sky").onclick = closeFon;
+  }
+  // Qator-qator savol: har qatorda to'g'ri variant topilguncha urinish mumkin (jarima yo'q)
+  function fonRows(box, rows, ok) {
+    let left = rows.length;
+    box.insertAdjacentHTML("beforeend", rows.map((r, ri) => `<div class="fn-row" data-r="${ri}"><div class="fn-q">${r.q}</div><div class="fn-opts">${r.opts.map((o, oi) => `<button data-o="${oi}">${o}</button>`).join("")}</div></div>`).join(""));
+    box.querySelectorAll(".fn-row button").forEach(b => (b.onclick = () => {
+      const row = b.closest(".fn-row"), r = rows[+row.dataset.r]; if (row.classList.contains("ok")) return;
+      if (+b.dataset.o === r.correct) { b.classList.add("good"); row.classList.add("ok"); sfx("pop"); if (--left === 0) ok(); }
+      else { b.classList.add("bad"); sfx("bad"); setTimeout(() => b.classList.remove("bad"), 500); }
+    }));
+  }
+  const fonPrev = i => FON.harflar.slice(0, i).flatMap(x => [...x.syll, ...x.words]);
+  const FON_STEP = {
+    // 👋 Tanishuv: harf shakllari, maxraji, maslahat; uchala bo'g'inni tinglash kerak
+    meet(h, box, ok) {
+      const c = h.char, nj = NOJOIN.includes(c), Z = "\u200d";
+      const forms = [["Alohida", c], ["So'z boshida", nj ? c : c + Z], ["O'rtasida", nj ? Z + c : Z + c + Z], ["Oxirida", Z + c]];
+      box.innerHTML = `<div class="fn-letter ar">${c}</div>
+        <div class="fn-forms">${forms.map(([n, f]) => `<div><span class="ar">${f}</span><small>${n}</small></div>`).join("")}</div>
+        <div class="fn-card"><small>📍 Maxraji (chiqish joyi)</small><p>${esc(h.maxraj)}</p></div>
+        ${h.tip ? `<div class="fn-card tip"><small>💡 Maslahat</small><p>${esc(h.tip)}</p></div>` : ""}
+        ${h.harakat ? `<div class="fn-hk">${FON_HARAKAT.map(([s, n, v, d]) => `<div><span class="ar">${s}</span><b>${n} = ${v}</b><small>${d}</small></div>`).join("")}</div>` : ""}
+        <p class="fn-ask">🔊 Uchala tovushni bosib tinglang va takrorlang:</p>
+        <div class="fn-syll">${h.syll.map((s, j) => `<button class="ar" data-s="${j}">${s}</button>`).join("")}</div>`;
+      const heard = new Set();
+      box.querySelectorAll("[data-s]").forEach(b => (b.onclick = () => { fonPlay(h.syll[+b.dataset.s]); b.classList.add("on"); heard.add(b.dataset.s); if (heard.size === h.syll.length) ok(); }));
+    },
+    // 🧩 Sifatlar: avval yodlab olinadi, keyin tekshiriladi (markaz talabi: bolalar ham yodlaydi). Alifda — harakatlar
+    sifat(h, box, ok) {
+      if (h.harakat) {
+        box.innerHTML = `<p class="fn-ask">Har bir belgi qaysi tovushni beradi?</p>`;
+        return fonRows(box, shuffle(FON_HARAKAT.map(([s, n, v]) => ({ q: `<span class="ar big">${s}</span>`, opts: ["a", "i", "u", "unlisiz"], correct: ["a", "i", "u", "unlisiz"].indexOf(v) }))), ok);
+      }
+      const table = quiz => FON_SIFAT.map(([q, opts], r) => `<div class="fn-srow"><small>${q}</small><div>${opts.map(([uz, ar, d], o) => `<span class="${!quiz && o === h.sifat[r] ? "on" : ""}"><b>${uz}</b><i>${ar}</i>${!quiz && o === h.sifat[r] ? `<em>${d}</em>` : ""}</span>`).join("")}</div></div>`).join("");
+      box.innerHTML = `<p class="fn-ask">«${esc(h.name)}» harfining sifatlari. Yodlab oling:</p><div class="fn-stable">${table(false)}</div>
+        ${h.special ? `<div class="fn-card tip"><small>⭐ O'ziga xos sifati</small><p>${esc(h.special)}</p></div>` : ""}
+        <button class="fn-ghost" id="fn-quiz">Yodladim, tekshirib ko'r →</button>`;
+      $("#fn-quiz").onclick = () => {
+        box.innerHTML = `<p class="fn-ask">«${esc(h.name)}» harfi qanday? Har qatordan to'g'risini tanlang:</p>`;
+        fonRows(box, FON_SIFAT.map(([q, opts], r) => ({ q, opts: opts.map(([uz, ar]) => `${uz}<i>${ar}</i>`), correct: h.sifat[r] })), ok);
+      };
+    },
+    // 🎧 Tinglab top: ovoz eshitiladi, to'g'ri yozuv tanlanadi
+    listen(h, box, ok, i) {
+      const pool = [...h.syll, ...h.words], other = fonPrev(i), n = Math.max(4, Math.min(6, pool.length));
+      const targets = [...shuffle(pool), ...shuffle(pool)].slice(0, n);
+      let r = 0;
+      const round = () => {
+        if (r >= n) { box.innerHTML = `<p class="fn-ask">🎉 Hammasini to'g'ri eshitdingiz!</p>`; return ok(); }
+        const t = targets[r], opts = shuffle([t, ...shuffle([...new Set([...pool, ...other])].filter(x => x !== t)).slice(0, 2)]);
+        box.innerHTML = `<p class="fn-ask">Tinglang va eshitganingizni toping (${r + 1}/${n})</p>
+          <button class="fn-play" id="fn-play" aria-label="Qayta tinglash">🔊</button>
+          <div class="fn-choice">${opts.map(o => `<button class="ar" data-v="${o}">${o}</button>`).join("")}</div>`;
+        $("#fn-play").onclick = () => fonPlay(t);
+        box.querySelectorAll("[data-v]").forEach(b => (b.onclick = () => {
+          if (b.dataset.v === t) { b.classList.add("good"); sfx("pop"); r++; setTimeout(round, 550); }
+          else { b.classList.add("bad"); sfx("bad"); setTimeout(() => { b.classList.remove("bad"); fonPlay(t); }, 500); }
+        }));
+        setTimeout(() => fonPlay(t), 250);
+      };
+      round();
+    },
+    // 📖 O'qish: avval o'zi o'qiydi, keyin bosib tekshiradi
+    read(h, box, ok) {
+      box.innerHTML = `<p class="fn-ask">Avval o'zingiz o'qing, keyin bosib tekshiring:</p><div class="fn-words">${h.words.map((w, j) => `<button class="ar" data-w="${j}">${w}</button>`).join("")}</div>`;
+      const seen = new Set();
+      box.querySelectorAll("[data-w]").forEach(b => (b.onclick = () => { fonPlay(h.words[+b.dataset.w]); b.classList.add("on"); seen.add(b.dataset.w); if (seen.size === h.words.length) ok(); }));
+    },
+    // 🔗 Yig'ish: ajratilgan harflar qo'shilsa, qaysi so'z chiqadi
+    join(h, box, ok, i) {
+      const items = h.join, all = [...new Set([...items.map(p => p.join("")), ...h.words, ...h.syll, ...fonPrev(i)])];
+      let r = 0;
+      const round = () => {
+        if (r >= items.length) { box.innerHTML = `<p class="fn-ask">🎉 Barakalla, hammasini yig'dingiz!</p>`; return ok(); }
+        const parts = items[r], t = parts.join(""), opts = shuffle([t, ...shuffle(all.filter(x => x !== t)).slice(0, 2)]);
+        box.innerHTML = `<p class="fn-ask">Harflar qo'shilsa, qaysi so'z chiqadi? (${r + 1}/${items.length})</p>
+          <div class="fn-parts ar">${parts.map(x => `<span>${x}</span>`).join("<i>+</i>")}</div>
+          <div class="fn-choice">${opts.map(o => `<button class="ar" data-v="${o}">${o}</button>`).join("")}</div>`;
+        box.querySelectorAll("[data-v]").forEach(b => (b.onclick = () => {
+          if (b.dataset.v === t) { b.classList.add("good"); fonPlay(t); r++; setTimeout(round, 900); }
+          else { b.classList.add("bad"); sfx("bad"); setTimeout(() => b.classList.remove("bad"), 500); }
+        }));
+      };
+      round();
+    },
+    // ✍️ Yozish: xira harf ustidan barmoq bilan chiziladi
+    write(h, box, ok) {
+      box.innerHTML = `<p class="fn-ask">Barmog'ingiz bilan harf ustidan yozing:</p><canvas class="fn-cv" id="fn-cv" width="600" height="600"></canvas>
+        <button class="fn-ghost" id="fn-clear">🧽 Tozalash</button>`;
+      const cv = $("#fn-cv"), c = cv.getContext("2d");
+      let len = 0, last = null;
+      const base = () => { c.clearRect(0, 0, 600, 600); c.fillStyle = "rgba(243,217,139,.2)"; c.textAlign = "center"; c.textBaseline = "middle"; c.font = '400px "Amiri", serif'; c.fillText(h.char, 300, 290); len = 0; };
+      const pos = e => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * 600 / r.width, y: (e.clientY - r.top) * 600 / r.height }; };
+      cv.onpointerdown = e => { try { cv.setPointerCapture(e.pointerId); } catch { /* */ } last = pos(e); };
+      cv.onpointermove = e => { if (!last) return; const p = pos(e); c.strokeStyle = "#F3D98B"; c.lineWidth = 22; c.lineCap = "round"; c.beginPath(); c.moveTo(last.x, last.y); c.lineTo(p.x, p.y); c.stroke(); len += Math.hypot(p.x - last.x, p.y - last.y); last = p; if (len > 260) ok(); };
+      cv.onpointerup = cv.onpointercancel = () => (last = null);
+      $("#fn-clear").onclick = base;
+      (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(base);
+    },
+  };
+
+  // ---------- Ishga tushirish ----------
+  const m = location.hash.match(/ustoz=([0-9a-f]{20,})/i);
+  if (m) { store.set(K_TEACHER, m[1]); history.replaceState(null, "", location.pathname + location.search); }
+  // Taklif havolasi: ?ref=KOD — eslab qolamiz, kirish oynasida kim taklif qilganini ko'rsatamiz
+  const refParam = new URLSearchParams(location.search).get("ref");
+  if (refParam && /^[0-9a-f]{8}$/i.test(refParam)) {
+    store.set(K_REF, refParam.toLowerCase());
+    history.replaceState(null, "", location.pathname + location.hash);
+    rpc("ref_lookup", { p_ref: refParam }).then(r => {
+      if (!r) return;
+      $("#auth-ref").hidden = false;
+      $("#auth-ref").textContent = `🎉 Sizni ${r.inviter} taklif qildi! Ro'yxatdan o'ting va birinchi darsni o'ting: ikkalangizga +${REF_BONUS} XP`;
+      if (!$("#auth-code").value) $("#auth-code").value = r.code;
+    }).catch(() => {});
+  }
+  $("#p-invite").onclick = shareInvite;
+  $$("[data-board]").forEach(b => (b.onclick = () => { boardMode = b.dataset.board; renderBoard(); }));
+
+  // Ustoz: havola orqali yoki avval parol bilan kirilgan bo'lsa (oxirgi tanlangan rejim eslab qolinadi)
+  TT = (m && m[1]) || store.get(K_TEACHER) || null;
+  $("#auth-teacher").onclick = teacherLoginSheet;
+  $("#p-teacher").hidden = !TT;
+  $("#p-teacher").onclick = () => { $(".tabbar").hidden = true; startTeacher(); };
+  if (TT && (m || location.hash === "#ustoz" || store.get(K_MODE) === "teacher")) startTeacher();
+  else if (TOKEN) boot();
+  else showAuth();
+})();
